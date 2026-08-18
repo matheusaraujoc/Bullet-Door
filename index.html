@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Bullet Door</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128682;</text></svg >" />
+<link rel="stylesheet" href="/src/ui/hud.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- ================= HUD ================= -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"><span></span><span></span><span></span><span></span></div>
+
+    <div id="top">
+      <div id="timer">00:30</div>
+      <div id="role">CAÇADOR</div>
+      <div id="objective">ENCONTRE E ELIMINE</div>
+      <div id="phasebar"><i></i></div>
+    </div>
+
+    <div id="score">
+      <div class="s-row"><span class="s-lab">VOCÊ</span><span class="s-val" id="scoreYou">0</span></div>
+      <div class="s-sep"></div>
+      <div class="s-row"><span class="s-lab">BOT</span><span class="s-val" id="scoreBot">0</span></div>
+      <div class="s-round" id="roundLabel">RODADA 1</div>
+    </div>
+
+    <!-- indicador de ruído direcional -->
+    <div id="noisering"></div>
+
+    <div id="prompt" class="hidden">[E] PORTA</div>
+    <div id="weapon" class="hidden"><b>∞</b><span id="cooldown"></span></div>
+
+    <div id="stamina"><i></i></div>
+
+    <div id="killfeed"></div>
+    <div id="flash"></div>
+    <div id="vignette"></div>
+    <div id="bigmsg" class="hidden"><div class="bm-sub"></div><div class="bm-main"></div></div>
+  </div>
+
+  <!-- ================= MENUS ================= -->
+  <div id="menu">
+    <div class="m-card">
+      <h1>BULLET<span>DOOR</span></h1>
+      <p class="tag">Um tiro mata. Trinta segundos caçando, trinta fugindo.</p>
+      <button id="btnPlay">JOGAR</button>
+      <div class="keys">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover</div>
+        <div><kbd>SHIFT</kbd> correr (faz barulho)</div>
+        <div><kbd>CTRL</kbd> andar agachado (silencioso)</div>
+        <div><kbd>E</kbd> abrir / fechar porta</div>
+        <div><kbd>MOUSE</kbd> mirar &nbsp;·&nbsp; <kbd>CLIQUE</kbd> atirar</div>
+        <div><kbd>ESC</kbd> pausar</div>
+      </div>
+      <div class="hint">Clique para travar o mouse</div>
+    </div>
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="m-card">
+      <h2>PAUSADO</h2>
+      <button id="btnResume">CONTINUAR</button>
+      <button id="btnQuit" class="ghost">SAIR DA PARTIDA</button>
+    </div>
+  </div>
+
+  <div id="matchend" class="hidden">
+    <div class="m-card">
+      <h2 id="meTitle">VITÓRIA</h2>
+      <div id="meScore">2 — 1</div>
+      <button id="btnAgain">JOGAR NOVAMENTE</button>
+    </div>
+  </div>
+
+  <div id="loading">CARREGANDO<span class="dots"></span></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

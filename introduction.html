@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Kountera Games</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:        #050403;
+    --bg-2:      #0c0906;
+    --orange:    #F76616;
+    --orange-lt: #FFA24D;
+    --orange-dp: #7A2E06;
+    --ivory:     #F5F3EE;
+    --line:      rgba(247,102,22,.08);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{
+    background: var(--bg);
+    height:100%;
+    overflow:hidden; /* locked while intro plays, released on enter */
+  }
+  body.unlocked{ overflow:auto; }
+
+  body{
+    font-family:'Rajdhani', sans-serif;
+    color: var(--ivory);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button{ font-family:inherit; }
+
+  /* ================= LOOP STAGE ================= */
+  .intro{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  /* ambient moving diagonal grid, kept quiet on purpose */
+  .grid-bg{
+    position:absolute; inset:-20%;
+    background-image:
+      repeating-linear-gradient(115deg, var(--line) 0 1px, transparent 1px 90px),
+      repeating-linear-gradient(25deg, var(--line) 0 1px, transparent 1px 90px);
+    animation: driftGrid 40s linear infinite;
+    opacity:.6;
+  }
+  @keyframes driftGrid{
+    0%{ transform: translate(0,0); }
+    100%{ transform: translate(-90px,-90px); }
+  }
+
+  .vignette{
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at center, transparent 35%, var(--bg) 88%);
+    pointer-events:none;
+  }
+
+  /* ---------- shard field (entrance / exit assembly) ---------- */
+  .shard-field{
+    position:absolute; inset:0;
+    pointer-events:none;
+  }
+  .shard{
+    position:absolute;
+    top:50%; left:50%;
+    width: var(--w, 90px);
+    height: var(--h, 18px);
+    background: linear-gradient(115deg, var(--orange-lt), var(--orange) 55%, var(--orange-dp));
+    clip-path: polygon(18% 0%, 100% 0%, 82% 100%, 0% 100%);
+    box-shadow: 0 0 18px rgba(247,102,22,.55);
+    opacity:0;
+    transform: translate(-50%,-50%) translate(0,0) rotate(0deg) scale(.85);
+    animation: shardBurst var(--dur, .85s) cubic-bezier(.16,.84,.44,1) var(--delay,0s) forwards;
+  }
+  @keyframes shardBurst{
+    0%{   opacity: var(--peak,.95); transform: translate(-50%,-50%) translate(0,0) rotate(0deg) scale(.85); }
+    12%{  opacity: var(--peak,.95); transform: translate(-50%,-50%) translate(0,0) rotate(0deg) scale(1); }
+    100%{ opacity:0; transform: translate(-50%,-50%) translate(var(--sx), var(--sy)) rotate(var(--srot)) scale(.55); }
+  }
+
+  /* ---------- flash + spark particles ---------- */
+  .flash{
+    position:absolute; inset:0;
+    background: radial-gradient(circle, rgba(255,255,255,.95), rgba(247,102,22,.4) 40%, transparent 70%);
+    opacity:0;
+    pointer-events:none;
+  }
+  .flash.pulse{ animation: flashPulse .5s ease-out; }
+  @keyframes flashPulse{
+    0%{ opacity:0; }
+    12%{ opacity:1; }
+    100%{ opacity:0; }
+  }
+
+  .particles{ position:absolute; inset:0; pointer-events:none; }
+  .spark{
+    position:absolute; top:50%; left:50%;
+    width:4px; height:4px;
+    background: var(--orange-lt);
+    box-shadow: 0 0 8px 1px var(--orange);
+    opacity:0;
+    animation: sparkOut .7s ease-out forwards;
+  }
+  @keyframes sparkOut{
+    0%{   opacity:1; transform: translate(-50%,-50%) translate(0,0) scale(1); }
+    100%{ opacity:0; transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) scale(.2); }
+  }
+
+  /* ---------- logo ---------- */
+  .logo-stage{
+    position:relative;
+    display:inline-block;
+    z-index:2;
+    opacity:0;
+    transform: scale(.94);
+    transition: opacity .35s ease, transform .5s cubic-bezier(.2,.9,.25,1.1);
+  }
+  .logo-stage.show{ opacity:1; transform:scale(1); }
+  .logo-stage.exiting{
+    opacity:0;
+    transform: scale(1.08);
+    transition: opacity .5s ease, transform .6s ease;
+  }
+
+  .logo{
+    display:block;
+    width: clamp(220px, 34vw, 460px);
+    height: auto;
+    filter: drop-shadow(0 0 18px rgba(247,102,22,.35));
+    animation: breathe 4.5s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{ filter: drop-shadow(0 0 14px rgba(247,102,22,.3)); }
+    50%{     filter: drop-shadow(0 0 34px rgba(247,102,22,.65)); }
+  }
+
+  /* shine sweep, masked to the logo's own alpha so it only glints on the mark */
+  .sweep{
+    position:absolute; inset:0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 48%, transparent 66%);
+    background-size: 300% 300%;
+    background-position: 120% 0%;
+    -webkit-mask-image: url('images/Kountera_Games_Logo.png');
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: url('images/Kountera_Games_Logo.png');
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mix-blend-mode: overlay;
+    opacity:0;
+    animation: sweepMove 4.5s ease-in-out infinite;
+    animation-delay: .4s;
+  }
+  @keyframes sweepMove{
+    0%{   background-position: 130% 0%; opacity:0; }
+    18%{  opacity:.9; }
+    38%{  background-position: -30% 0%; opacity:0; }
+    100%{ background-position: -30% 0%; opacity:0; }
+  }
+
+  /* ---------- sound toggle ---------- */
+  .sound-toggle{
+    position:absolute; top:24px; right:26px;
+    z-index:3;
+    width:38px; height:38px;
+    background: transparent;
+    border:1px solid rgba(247,102,22,.4);
+    color: var(--orange-lt);
+    font-size:15px;
+    cursor:pointer;
+    clip-path: polygon(6px 0,100% 0,100% 100%,0 100%,0 6px);
+    transition: border-color .2s ease, color .2s ease;
+  }
+  .sound-toggle:hover{ border-color: var(--orange); color: var(--orange); }
+
+  /* ---------- reduced motion & small screens ---------- */
+  @media (prefers-reduced-motion: reduce){
+    .shard, .sweep, .grid-bg, .logo, .flash{ animation: none !important; }
+    .logo-stage{ transition: opacity .4s ease; }
+  }
+  @media (max-width: 540px){
+    .sound-toggle{ top:16px; right:16px; width:34px; height:34px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="intro" id="intro">
+    <div class="grid-bg"></div>
+    <div class="vignette"></div>
+    <div class="shard-field" id="shardField"></div>
+    <div class="particles" id="particles"></div>
+    <div class="flash" id="flash"></div>
+
+    <div class="logo-stage" id="logoStage">
+      <img src="images/Kountera_Games_Logo.png" alt="Kountera Games" class="logo" id="logoImg">
+      <div class="sweep"></div>
+    </div>
+
+    <button class="sound-toggle" id="soundToggle" aria-label="Ativar ou desativar som">🔊</button>
+  </div>
+
+<script>
+(function(){
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const shardField   = document.getElementById('shardField');
+  const particlesEl  = document.getElementById('particles');
+  const flash        = document.getElementById('flash');
+  const logoStage    = document.getElementById('logoStage');
+  const soundToggle  = document.getElementById('soundToggle');
+
+  let soundOn = true;
+
+  /* ---------------- audio (synthesized, no files needed) ----------------
+     O som roda junto com o ciclo da animação (não depende de clique).
+     Navegadores bloqueiam áudio antes de qualquer interação do usuário;
+     por isso destravamos o AudioContext no primeiro toque/clique/tecla,
+     e a partir daí cada ciclo do loop toca seu som normalmente. */
+  let actx = null;
+  function ctx(){
+    if(!actx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) actx = new AC();
+    }
+    return actx;
+  }
+  ['pointerdown','keydown','touchstart'].forEach(evt => {
+    window.addEventListener(evt, () => {
+      const c = ctx();
+      if(c && c.state === 'suspended') c.resume();
+    }, { once:true, passive:true });
+  });
+
+  function tone(freq, dur, type, startGain, delay){
+    if(!soundOn) return;
+    const c = ctx();
+    if(!c || c.state === 'suspended') return;
+    const t0 = c.currentTime + (delay||0);
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(startGain, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+  function playImpact(){
+    tone(90, .35, 'sine', .5, 0);
+    tone(180, .18, 'triangle', .25, 0);
+  }
+  function playWhoosh(volume){
+    const c = ctx();
+    if(!c || !soundOn || c.state === 'suspended') return;
+    const bufSize = c.sampleRate * 0.5;
+    const buf = c.createBuffer(1, bufSize, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufSize);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const filt = c.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.setValueAtTime(1200, c.currentTime);
+    filt.frequency.exponentialRampToValueAtTime(300, c.currentTime + .45);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(volume||.25, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + .45);
+    src.connect(filt).connect(gain).connect(c.destination);
+    src.start();
+  }
+
+  soundToggle.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundToggle.textContent = soundOn ? '🔊' : '🔇';
+    const c = ctx();
+    if(c && c.state === 'suspended') c.resume();
+  });
+
+  /* ---------------- shard geometry helpers ---------------- */
+  function rand(min, max){ return Math.random() * (max - min) + min; }
+
+  // Gera os parâmetros de cada estilhaço UMA vez por ciclo: todos partem
+  // do centro (onde a logo vai aparecer) e voam para fora, como uma
+  // explosão de fragmentos.
+  function buildShardParams(count){
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const arr = [];
+    for(let i=0;i<count;i++){
+      const angle = rand(0, Math.PI*2);
+      const dist  = rand(vw*.35, vw*.75);
+      arr.push({
+        sx: Math.cos(angle) * dist,
+        sy: Math.sin(angle) * dist * (vh/vw),
+        rot: rand(-160, 160),
+        w: rand(50, 130),
+        h: rand(10, 24),
+        dur: rand(.65, 1.0),
+        delay: rand(0, .1),   // quase simultâneo: sensação de detonação
+        peak: rand(.7, 1)
+      });
+    }
+    return arr;
+  }
+
+  function spawnShards(params, container){
+    const frag = document.createDocumentFragment();
+    params.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'shard';
+      el.style.setProperty('--sx', p.sx.toFixed(1)+'px');
+      el.style.setProperty('--sy', p.sy.toFixed(1)+'px');
+      el.style.setProperty('--srot', p.rot.toFixed(1)+'deg');
+      el.style.setProperty('--w', p.w.toFixed(0)+'px');
+      el.style.setProperty('--h', p.h.toFixed(0)+'px');
+      el.style.setProperty('--dur', p.dur.toFixed(2)+'s');
+      el.style.setProperty('--delay', p.delay.toFixed(2)+'s');
+      el.style.setProperty('--peak', p.peak.toFixed(2));
+      frag.appendChild(el);
+    });
+    container.appendChild(frag);
+  }
+
+  function burstParticles(count){
+    const frag = document.createDocumentFragment();
+    for(let i=0;i<count;i++){
+      const el = document.createElement('div');
+      el.className = 'spark';
+      const angle = rand(0, Math.PI*2);
+      const dist = rand(60, 220);
+      el.style.setProperty('--dx', (Math.cos(angle)*dist).toFixed(1)+'px');
+      el.style.setProperty('--dy', (Math.sin(angle)*dist).toFixed(1)+'px');
+      el.style.animationDelay = rand(0,.1).toFixed(2)+'s';
+      frag.appendChild(el);
+    }
+    particlesEl.appendChild(frag);
+    setTimeout(() => { particlesEl.innerHTML = ''; }, 1000);
+  }
+
+  function doFlash(){
+    flash.classList.remove('pulse');
+    void flash.offsetWidth; // reinicia a animação
+    flash.classList.add('pulse');
+  }
+
+  /* ---------------- timings do ciclo (ms) ---------------- */
+  const SHARD_COUNT = reduceMotion ? 0 : (window.innerWidth < 560 ? 10 : 16);
+  const REVEAL_MS   = reduceMotion ? 150 : 220;   // detonação -> logo aparece
+  const HOLD_MS     = reduceMotion ? 2200 : 3200; // logo parada, respirando
+  const FADE_MS     = reduceMotion ? 300 : 550;   // logo desaparece
+  const PAUSE_MS    = reduceMotion ? 400 : 550;   // pausa no escuro antes da próxima explosão
+
+  document.getElementById('logoImg').addEventListener('error', () => {
+    logoStage.classList.add('show'); // fallback caso a imagem não carregue
+  });
+
+  function playCycle(){
+    shardField.innerHTML = '';
+    logoStage.classList.remove('show', 'exiting');
+
+    // ---- explosão: fragmentos partem do centro e voam para fora ----
+    doFlash();
+    if(SHARD_COUNT > 0) spawnShards(buildShardParams(SHARD_COUNT), shardField);
+    if(!reduceMotion) burstParticles(20);
+    playImpact();
+    setTimeout(() => playWhoosh(.18), 60);
+
+    // limpa os fragmentos depois que terminam de voar
+    setTimeout(() => { shardField.innerHTML = ''; }, 1050);
+
+    // ---- a logo aparece logo após a detonação ----
+    setTimeout(() => {
+      logoStage.classList.add('show');
+    }, REVEAL_MS);
+
+    // ---- segura visível, depois desvanece ----
+    setTimeout(() => {
+      logoStage.classList.remove('show');
+      logoStage.classList.add('exiting');
+    }, REVEAL_MS + HOLD_MS);
+
+    // ---- reset + próximo ciclo ----
+    setTimeout(() => {
+      logoStage.classList.remove('exiting');
+      playCycle();
+    }, REVEAL_MS + HOLD_MS + FADE_MS + PAUSE_MS);
+  }
+
+  playCycle();
+})();
+</script>
+</body>
+</html>

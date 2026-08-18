@@ -1,0 +1,218 @@
+/*
+ * Interface no mesmo espírito dos modelos: blocos sólidos, cantos retos,
+ * sombra dura sem desfoque e as cores da Endesga 32. Cores alegres em cima de
+ * um fundo quase preto — fofo por fora, sombrio por baixo.
+ * As variáveis --edg-* são injetadas em tempo de execução por palette.js.
+ */
+:root {
+  --hunter: #e43b44;
+  --runner: #2ce8f5;
+  --ink: #181425;
+  --ink2: #262b44;
+  --ink3: #3a4466;
+  --paper: #c0cbdc;
+  --paper2: #8b9bb4;
+  --gold: #feae34;
+  --sombra: 4px 4px 0 rgba(24, 20, 37, .85);
+  --sombra-p: 3px 3px 0 rgba(24, 20, 37, .85);
+  --fonte: "Bahnschrift", "DIN Alternate", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%; overflow: hidden; background: var(--ink);
+  color: var(--paper); font-family: var(--fonte); font-weight: 700;
+  -webkit-user-select: none; user-select: none; -webkit-font-smoothing: antialiased;
+}
+canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+/* ============================== HUD ============================== */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+/* mira: quatro blocos, nada de linhas finas */
+#crosshair {
+  position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
+  transform: translate(-50%, -50%); transition: transform .12s;
+}
+#crosshair span { position: absolute; background: var(--paper); box-shadow: 0 0 0 2px rgba(24,20,37,.75); }
+#crosshair span:nth-child(1), #crosshair span:nth-child(2) { width: 4px; height: 8px; left: 11px; }
+#crosshair span:nth-child(1) { top: 0; }
+#crosshair span:nth-child(2) { bottom: 0; }
+#crosshair span:nth-child(3), #crosshair span:nth-child(4) { height: 4px; width: 8px; top: 11px; }
+#crosshair span:nth-child(3) { left: 0; }
+#crosshair span:nth-child(4) { right: 0; }
+#crosshair.wide { transform: translate(-50%, -50%) scale(1.5); }
+body.runner #crosshair { opacity: 0; }
+
+/* topo: relógio + papel */
+#top { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); text-align: center; width: 360px; }
+#timer {
+  font-size: 60px; font-weight: 800; letter-spacing: 2px; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--paper);
+  text-shadow: var(--sombra);
+}
+#role { margin-top: 6px; font-size: 15px; letter-spacing: 7px; font-weight: 800; text-shadow: var(--sombra-p); }
+#objective {
+  margin-top: 5px; font-size: 11px; letter-spacing: 3px; color: var(--paper2);
+  background: rgba(24,20,37,.72); display: inline-block; padding: 4px 10px;
+}
+/* barra da fase em blocos, como uma barra de energia de jogo antigo */
+#phasebar {
+  margin: 10px auto 0; width: 264px; height: 12px; background: rgba(24,20,37,.8);
+  border: 3px solid var(--ink); box-shadow: var(--sombra-p); overflow: hidden;
+}
+#phasebar i {
+  display: block; height: 100%; width: 100%; transform-origin: left;
+  background: currentColor; transition: transform .12s linear;
+}
+body.hunter #role, body.hunter #phasebar { color: var(--hunter); }
+body.runner #role, body.runner #phasebar { color: var(--runner); }
+#timer.urgent { color: var(--hunter); animation: bater .55s steps(2) infinite; }
+@keyframes bater { 50% { transform: scale(1.08); } }
+
+/* placar */
+#score { position: absolute; top: 22px; right: 26px; text-align: right; }
+.s-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.s-lab { color: var(--paper2); font-size: 11px; letter-spacing: 3px; }
+.s-val {
+  font-size: 22px; font-weight: 800; min-width: 38px; text-align: center;
+  background: var(--ink2); border: 3px solid var(--ink); box-shadow: var(--sombra-p);
+  padding: 2px 0; font-variant-numeric: tabular-nums;
+}
+.s-sep { height: 6px; }
+.s-round { margin-top: 10px; font-size: 10px; color: var(--paper2); letter-spacing: 4px; }
+
+/* setas de direção: apontam de onde veio o barulho, nunca a posição exata */
+#noisering { position: absolute; inset: 0; }
+#noisering .blip {
+  position: absolute; left: 50%; top: 50%; width: 42px; height: 44px;
+  margin: -22px 0 0 -21px; transform-origin: 50% 50%;
+  opacity: 0; will-change: transform, opacity; overflow: visible;
+}
+#noisering .blip polygon {
+  fill: var(--hunter); stroke: var(--ink); stroke-width: 3.5; stroke-linejoin: miter;
+  paint-order: stroke fill;
+}
+body.runner #noisering .blip polygon { fill: var(--runner); }
+/* estufada curta ao surgir, para o olho pegar mesmo em movimento */
+#noisering .blip.bater polygon { animation: setaBate .3s steps(3); }
+@keyframes setaBate {
+  0% { transform: scale(.4); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+#noisering .blip polygon { transform-origin: 50% 50%; transform-box: fill-box; }
+
+/* aviso de porta */
+#prompt {
+  position: absolute; left: 50%; top: 60%; transform: translateX(-50%);
+  font-size: 12px; letter-spacing: 3px; padding: 8px 14px;
+  background: var(--ink2); border: 3px solid var(--ink); box-shadow: var(--sombra);
+}
+
+/* arma: munição infinita, o que limita é a cadência */
+#weapon { position: absolute; right: 30px; bottom: 24px; text-align: right; }
+#weapon b { font-size: 30px; font-weight: 800; letter-spacing: 1px; text-shadow: var(--sombra-p); }
+#cooldown {
+  display: block; width: 76px; height: 10px; margin-top: 6px;
+  background: rgba(24,20,37,.8); border: 3px solid var(--ink);
+  box-shadow: var(--sombra-p); position: relative; overflow: hidden;
+}
+#cooldown::after {
+  content: ""; position: absolute; inset: 0; background: var(--hunter);
+  transform: scaleX(var(--cd, 0)); transform-origin: left;
+}
+
+/* fôlego */
+#stamina {
+  position: absolute; left: 30px; bottom: 26px; width: 130px; height: 10px;
+  background: rgba(24,20,37,.8); border: 3px solid var(--ink);
+  box-shadow: var(--sombra-p); opacity: 0; transition: opacity .25s;
+}
+#stamina.show { opacity: 1; }
+#stamina i { display: block; height: 100%; background: var(--paper); transform-origin: left; transition: transform .1s linear; }
+#stamina.low i { background: var(--hunter); }
+
+/* avisos */
+#killfeed { position: absolute; left: 50%; top: 128px; transform: translateX(-50%); text-align: center; }
+#killfeed div {
+  font-size: 12px; letter-spacing: 3px; margin-bottom: 5px; padding: 5px 12px;
+  background: var(--ink2); border: 3px solid var(--ink); box-shadow: var(--sombra-p);
+  animation: subir 2.6s forwards;
+}
+@keyframes subir {
+  0% { opacity: 0; transform: translateY(8px); }
+  12% { opacity: 1; transform: none; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 150px 8px rgba(24,20,37,.5); transition: box-shadow .35s; }
+body.danger #vignette { box-shadow: inset 0 0 160px 26px rgba(228,59,68,.45); }
+
+/* mensagem grande */
+#bigmsg {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; background: rgba(24,20,37,.6);
+}
+.bm-sub { font-size: 13px; letter-spacing: 8px; color: var(--paper2); margin-bottom: 14px; }
+.bm-main {
+  font-size: 68px; font-weight: 800; letter-spacing: 5px; line-height: 1; text-align: center;
+  padding: 12px 30px; background: var(--ink2); border: 5px solid var(--ink);
+  box-shadow: 8px 8px 0 rgba(24,20,37,.9);
+}
+#bigmsg.hunter .bm-main { color: var(--hunter); }
+#bigmsg.runner .bm-main { color: var(--runner); }
+#bigmsg.pop .bm-main { animation: surgir .35s steps(3); }
+@keyframes surgir { from { transform: scale(.5); } to { transform: scale(1); } }
+
+/* ============================= MENUS ============================= */
+#menu, #pause, #matchend {
+  position: fixed; inset: 0; z-index: 20; display: flex;
+  align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 40%, #262b44 0%, #181425 70%);
+}
+#pause, #matchend { background: rgba(24,20,37,.9); }
+.m-card { text-align: center; padding: 36px 48px; max-width: 560px; }
+
+.m-card h1 {
+  font-size: 66px; font-weight: 800; letter-spacing: 3px; line-height: .95;
+  text-shadow: 6px 6px 0 rgba(0,0,0,.5);
+}
+.m-card h1 span { display: block; color: var(--hunter); }
+.m-card h2 { font-size: 40px; font-weight: 800; letter-spacing: 6px; margin-bottom: 20px; text-shadow: var(--sombra); }
+.tag { margin: 18px 0 30px; color: var(--paper2); font-size: 14px; letter-spacing: 1px; line-height: 1.7; font-weight: 400; }
+
+button {
+  font-family: var(--fonte); font-size: 16px; letter-spacing: 5px; font-weight: 800;
+  color: var(--ink); background: var(--paper); border: 4px solid var(--ink);
+  box-shadow: var(--sombra); padding: 14px 44px; cursor: pointer;
+  display: block; margin: 0 auto 14px; transition: none;
+}
+button:hover:not(:disabled) { background: var(--gold); transform: translate(-2px, -2px); box-shadow: 6px 6px 0 rgba(24,20,37,.85); }
+button:active:not(:disabled) { transform: translate(4px, 4px); box-shadow: 0 0 0 rgba(0,0,0,0); }
+button:disabled { background: var(--ink3); color: var(--paper2); cursor: wait; }
+button.ghost { background: transparent; color: var(--paper2); border-color: var(--ink3); font-size: 12px; padding: 10px 28px; box-shadow: none; }
+button.ghost:hover { background: var(--ink3); color: var(--paper); transform: none; box-shadow: none; }
+
+.keys { margin-top: 28px; display: grid; gap: 9px; font-size: 12px; color: var(--paper2); letter-spacing: 1px; font-weight: 400; }
+kbd {
+  display: inline-block; min-width: 24px; padding: 3px 7px; margin-right: 4px;
+  background: var(--ink2); border: 2px solid var(--ink3); box-shadow: 2px 2px 0 rgba(24,20,37,.8);
+  font-family: var(--fonte); font-size: 11px; font-weight: 700; color: var(--paper);
+}
+.hint { margin-top: 24px; font-size: 11px; letter-spacing: 3px; color: var(--ink3); }
+#meScore {
+  font-size: 50px; font-weight: 800; letter-spacing: 6px; margin-bottom: 26px;
+  font-variant-numeric: tabular-nums; text-shadow: var(--sombra);
+}
+
+#loading {
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center;
+  justify-content: center; background: var(--ink); font-size: 13px;
+  letter-spacing: 6px; color: var(--paper2);
+}
+.dots::after { content: ""; animation: pontos 1.2s steps(4, end) infinite; }
+@keyframes pontos { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
