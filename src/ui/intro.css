@@ -1,0 +1,140 @@
+/*
+ * Abertura do estúdio. Portada de introduction.html para dentro do jogo, com
+ * três diferenças: roda uma vez só (o original ficava em laço), dispara os
+ * áudios nos dois momentos marcados, e no fim entrega a tela para o menu.
+ */
+#intro {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: #050403;
+  font-family: "Rajdhani", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  color: #f5f3ee;
+  overflow: hidden;
+}
+#intro.saindo { opacity: 0; transition: opacity .6s ease; pointer-events: none; }
+
+/* grade diagonal de fundo, discreta de propósito */
+#intro .grid-bg {
+  position: absolute; inset: -20%;
+  background-image:
+    repeating-linear-gradient(115deg, rgba(247,102,22,.08) 0 1px, transparent 1px 90px),
+    repeating-linear-gradient(25deg, rgba(247,102,22,.08) 0 1px, transparent 1px 90px);
+  animation: introDrift 40s linear infinite;
+  opacity: .6;
+}
+@keyframes introDrift { to { transform: translate(-90px, -90px); } }
+
+#intro .vinheta {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 35%, #050403 88%);
+}
+
+/* estilhaços que partem do centro na detonação */
+#intro .shard-field { position: absolute; inset: 0; pointer-events: none; }
+#intro .shard {
+  position: absolute; top: 50%; left: 50%;
+  width: var(--w, 90px); height: var(--h, 18px);
+  background: linear-gradient(115deg, #ffa24d, #f76616 55%, #7a2e06);
+  clip-path: polygon(18% 0%, 100% 0%, 82% 100%, 0% 100%);
+  box-shadow: 0 0 18px rgba(247,102,22,.55);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.85);
+  animation: introShard var(--dur, .85s) cubic-bezier(.16,.84,.44,1) var(--delay, 0s) forwards;
+}
+@keyframes introShard {
+  0%   { opacity: var(--peak, .95); transform: translate(-50%,-50%) translate(0,0) rotate(0) scale(.85); }
+  12%  { opacity: var(--peak, .95); transform: translate(-50%,-50%) translate(0,0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) translate(var(--sx), var(--sy)) rotate(var(--srot)) scale(.55); }
+}
+
+#intro .flash {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at center, rgba(255,190,120,.9), transparent 60%);
+  opacity: 0;
+}
+#intro .flash.pulse { animation: introFlash .5s ease-out forwards; }
+@keyframes introFlash { 0% { opacity: .95; } 100% { opacity: 0; } }
+
+/* ---------------------------- a marca ---------------------------- */
+#intro .logo-stage {
+  position: relative; z-index: 2;
+  opacity: 0; transform: scale(.94);
+  transition: opacity .35s ease, transform .5s cubic-bezier(.2,.9,.25,1.1);
+}
+#intro .logo-stage.show { opacity: 1; transform: scale(1); }
+#intro .logo-stage.exiting {
+  opacity: 0; transform: scale(1.08);
+  transition: opacity .5s ease, transform .6s ease;
+}
+
+#intro .logo {
+  display: block; width: clamp(220px, 34vw, 460px); height: auto;
+  filter: drop-shadow(0 0 18px rgba(247,102,22,.35));
+  animation: introBreathe 4.5s ease-in-out infinite;
+}
+@keyframes introBreathe {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(247,102,22,.3)); }
+  50%      { filter: drop-shadow(0 0 34px rgba(247,102,22,.65)); }
+}
+
+/* Sem o arquivo do logo, a marca sai em tipografia — mesmo peso, mesma cor,
+   e o brilho metálico continua funcionando por cima. */
+#intro .logo-texto {
+  font-size: clamp(34px, 6.4vw, 78px);
+  font-weight: 700; letter-spacing: .14em; line-height: 1;
+  text-align: center; white-space: nowrap;
+  background: linear-gradient(180deg, #ffd7ae, #f76616 55%, #7a2e06);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 20px rgba(247,102,22,.4));
+  animation: introBreathe 4.5s ease-in-out infinite;
+}
+#intro .logo-texto small {
+  display: block; margin-top: 10px;
+  font-size: .26em; letter-spacing: .55em; font-weight: 600;
+  background: none; -webkit-text-fill-color: rgba(245,243,238,.5);
+}
+
+/* brilho metálico atravessando a marca */
+#intro .sweep {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 48%, transparent 66%);
+  background-size: 300% 300%;
+  background-position: 130% 0%;
+  mix-blend-mode: overlay;
+  opacity: 0;
+}
+#intro .sweep.mascara {
+  -webkit-mask-image: var(--logo-mask); mask-image: var(--logo-mask);
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+}
+#intro .sweep.brilhar { animation: introSweep 1.5s ease-in-out forwards; }
+@keyframes introSweep {
+  0%   { background-position: 130% 0%; opacity: 0; }
+  22%  { opacity: .95; }
+  100% { background-position: -30% 0%; opacity: 0; }
+}
+
+/* ------------------------- começar / pular ------------------------- */
+#intro .comecar {
+  position: absolute; inset: 0; z-index: 4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; cursor: pointer; background: #050403;
+}
+#intro .comecar b {
+  font-size: clamp(16px, 2.2vw, 22px); letter-spacing: .42em; font-weight: 600;
+  color: #ffa24d; animation: introPisca 2s ease-in-out infinite;
+}
+#intro .comecar span { font-size: 12px; letter-spacing: .3em; color: rgba(245,243,238,.35); }
+@keyframes introPisca { 50% { opacity: .35; } }
+
+#intro .pular {
+  position: absolute; right: 26px; bottom: 22px; z-index: 4;
+  font-size: 11px; letter-spacing: .3em; color: rgba(245,243,238,.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #intro .shard, #intro .grid-bg, #intro .logo, #intro .logo-texto, #intro .flash { animation: none !important; }
+}

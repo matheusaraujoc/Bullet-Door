@@ -342,6 +342,10 @@ export function generateMap(seed) {
     return reach === total;
   };
 
+  // Todo obstáculo tem corpo — inclusive o caixote baixo. O que muda entre os
+  // dois é a VISÃO: o pilar alto tampa, o caixote não. É isso que faz dele
+  // cobertura de verdade: você se abaixa atrás dele, mas continua enxergando.
+  const opacos = new Set();
   for (const r of rooms) {
     const n = 1 + Math.floor(rnd() * 2 + (r.w * r.h > 12 ? 1 : 0));
     for (let i = 0; i < n; i++) {
@@ -349,17 +353,29 @@ export function generateMap(seed) {
       const y = r.y + Math.floor(rnd() * r.h);
       const idx = at(x, y);
       if (g[idx] !== FLOOR || props.some(q => q.x === x && q.y === y)) continue;
+
+      // Agora que toda peça tem corpo, ela não pode nascer em cima de uma
+      // passagem: longe de porta, e só onde há espaço de sobra em volta.
+      // Caixote entalado num vão vira rolha, não cobertura.
+      const grau = DIRS.filter(d => g[at(x + d.dx, y + d.dy)] !== WALL).length;
+      if (grau < 3) continue;
+      const perto = DIRS.some(d => {
+        const j = at(x + d.dx, y + d.dy);
+        return g[j] === DOOR;
+      }) || g[idx] === DOOR;
+      if (perto) continue;
+
+      // e o mapa tem que continuar inteiro com ela no lugar
+      if (!conectadoCom(idx)) continue;
       const miolo = x > r.x && x < r.x + r.w - 1 && y > r.y && y < r.y + r.h - 1;
-      if (miolo && rnd() < 0.5 && conectadoCom(idx)) {
-        blocked.add(idx);
-        props.push({ x, y, alto: true, tema: r.tema });
-      } else {
-        props.push({ x, y, alto: false, tema: r.tema });
-      }
+      const alto = miolo && rnd() < 0.5;
+      blocked.add(idx);
+      if (alto) opacos.add(idx);
+      props.push({ x, y, alto, tema: r.tema });
     }
   }
 
-  return { grid: g, W, H, rooms, doors, props, blocked, seed, inRoom };
+  return { grid: g, W, H, rooms, doors, props, blocked, opacos, seed, inRoom };
 }
 
 // ------------------------------------------------------------------ helpers

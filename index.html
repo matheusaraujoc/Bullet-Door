@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Bullet Door</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128682;</text></svg >" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" />
 <link rel="stylesheet" href="/src/ui/hud.css" />
 </head>
 <body>
@@ -15,17 +19,23 @@
     <div id="crosshair"><span></span><span></span><span></span><span></span></div>
 
     <div id="top">
-      <div id="timer">00:30</div>
-      <div id="role">CAÇADOR</div>
+      <div class="painel">
+        <div id="role">CAÇADOR</div>
+        <div id="timer">00:30</div>
+        <div id="phasebar"><i></i></div>
+      </div>
       <div id="objective">ENCONTRE E ELIMINE</div>
-      <div id="phasebar"><i></i></div>
     </div>
 
     <div id="score">
-      <div class="s-row"><span class="s-lab">VOCÊ</span><span class="s-val" id="scoreYou">0</span></div>
-      <div class="s-sep"></div>
-      <div class="s-row"><span class="s-lab">BOT</span><span class="s-val" id="scoreBot">0</span></div>
-      <div class="s-round" id="roundLabel">RODADA 1</div>
+      <div class="painel">
+        <div class="s-round" id="roundLabel">RODADA 1</div>
+        <div class="s-linha">
+          <span class="s-lab">VOCÊ</span><span class="s-val" id="scoreYou">0</span>
+          <span class="s-x">·</span>
+          <span class="s-val" id="scoreBot">0</span><span class="s-lab">BOT</span>
+        </div>
+      </div>
     </div>
 
     <!-- indicador de ruído direcional -->
@@ -44,19 +54,27 @@
 
   <!-- ================= MENUS ================= -->
   <div id="menu">
+    <canvas id="menuArte"></canvas>
     <div class="m-card">
-      <h1>BULLET<span>DOOR</span></h1>
-      <p class="tag">Um tiro mata. Trinta segundos caçando, trinta fugindo.</p>
+      <div class="marca-jogo">
+        <span class="linha-1">BULLET</span>
+        <span class="guilhotina"></span>
+        <span class="linha-2">DOOR</span>
+      </div>
+      <p class="tag">Um tiro mata.<br>Trinta segundos caçando, trinta fugindo.</p>
       <button id="btnPlay">JOGAR</button>
       <div class="keys">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover</div>
-        <div><kbd>SHIFT</kbd> correr (faz barulho)</div>
-        <div><kbd>CTRL</kbd> andar agachado (silencioso)</div>
-        <div><kbd>E</kbd> abrir / fechar porta</div>
-        <div><kbd>MOUSE</kbd> mirar &nbsp;·&nbsp; <kbd>CLIQUE</kbd> atirar</div>
-        <div><kbd>ESC</kbd> pausar</div>
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>mover</em></div>
+        <div><kbd>SHIFT</kbd><em>correr — faz barulho longe</em></div>
+        <div><kbd>CTRL</kbd><em>agachar — silencioso e difícil de ver</em></div>
+        <div><kbd>Q</kbd><kbd>E</kbd><em>espiar pela esquerda e pela direita</em></div>
+        <div><kbd>F</kbd><em>abrir e fechar portas</em></div>
+        <div><kbd>CLIQUE</kbd><em>atirar — munição infinita</em></div>
+        <div><kbd>BOTÃO&nbsp;DIREITO</kbd><em>mira de ferro</em></div>
+        <div><kbd>ESC</kbd><em>pausar</em></div>
       </div>
-      <div class="hint">Clique para travar o mouse</div>
+      <div class="hint">clique na tela para travar o mouse</div>
+      <div class="selo">KOUNTERA GAMES</div>
     </div>
   </div>
 

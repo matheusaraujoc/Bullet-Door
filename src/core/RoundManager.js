@@ -26,11 +26,21 @@ export class RoundManager {
     this.lastTick = -1;
   }
 
-  /** Na rodada ímpar você caça primeiro; na par, o bot. */
-  get youHuntFirst() { return this.round % 2 === 1; }
+  /**
+   * Você caça a primeira metade, foge a segunda — em toda rodada.
+   *
+   * Já foi alternado por rodada (ímpar você começa, par o bot), e aquilo
+   * quebrava a alternância justamente na virada: a rodada terminava com o bot
+   * caçando e a seguinte começava com o bot caçando de novo. Quem jogava via o
+   * adversário caçar duas vezes seguidas e perdia a conta de quem estava
+   * ganhando o quê.
+   *
+   * Fixando a ordem, a partida inteira alterna sem falha — caça, foge, caça,
+   * foge — e cada rodada continua tendo uma caçada de cada lado, que é o que a
+   * comparação de tempos exige para ser justa.
+   */
   get playerRoleThisHalf() {
-    const youHunt = this.half === 0 ? this.youHuntFirst : !this.youHuntFirst;
-    return youHunt ? 'hunter' : 'runner';
+    return this.half === 0 ? 'hunter' : 'runner';
   }
 
   startMatch() {

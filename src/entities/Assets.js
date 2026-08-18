@@ -1,8 +1,26 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { asset } from '../core/assets-url.js';
 
 export const CHAR_HEIGHT = 1.8;      // altura desejada do personagem, em metros
+
+// 1x1 transparente
+const PIXEL_VAZIO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAf' +
+  'FcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+/**
+ * Os arquivos FBX carregam dentro deles os nomes das texturas que o autor
+ * usava (pistol.png, outsider.png…), que não vêm no pacote — as paletas certas
+ * são aplicadas à mão logo depois de carregar. Sem isto o loader sai pedindo
+ * cada um desses nomes e o console do jogador enche de 404 sem consequência.
+ */
+function gerenciadorSilencioso() {
+  const m = new THREE.LoadingManager();
+  m.setURLModifier(url =>
+    (/\.(png|jpe?g|tga|bmp|tif?f)$/i.test(url) && !url.startsWith('data:')) ? PIXEL_VAZIO : url);
+  return m;
+}
 
 /**
  * As texturas são paletas de 256x1 (Endesga 32). Filtro Nearest e sem mipmap
@@ -41,17 +59,17 @@ export class Assets {
   }
 
   async load(onProgress = () => {}) {
-    const loader = new FBXLoader();
+    const loader = new FBXLoader(gerenciadorSilencioso());
     let done = 0;
     const tick = o => { onProgress(++done / 3); return o; };
 
     const [char, pistol, shotgun] = await Promise.all([
-      loader.loadAsync('/models/voxel-character.fbx').then(tick),
-      loader.loadAsync('/models/voxel-pistol.fbx').then(tick),
-      loader.loadAsync('/models/voxel-shotgun.fbx').then(tick),
+      loader.loadAsync(asset('models/voxel-character.fbx')).then(tick),
+      loader.loadAsync(asset('models/voxel-pistol.fbx')).then(tick),
+      loader.loadAsync(asset('models/voxel-shotgun.fbx')).then(tick),
     ]);
 
-    applyMaterial(char, loadPalette('/models/voxel-character-texture.png'));
+    applyMaterial(char, loadPalette(asset('models/voxel-character-texture.png')));
     for (const clip of char.animations) clip.name = clip.name.replace(/^.*\|/, '');
     this.character = { object: char, animations: char.animations };
 
@@ -63,8 +81,8 @@ export class Assets {
     this.charScale = h > 0 ? CHAR_HEIGHT / h : 1;
     this.charRawHeight = h;
 
-    this.pistol = this._prepWeapon(pistol, loadPalette('/models/pistol-texture.png'));
-    this.shotgun = this._prepWeapon(shotgun, loadPalette('/models/shotgun-texture.png'));
+    this.pistol = this._prepWeapon(pistol, loadPalette(asset('models/pistol-texture.png')));
+    this.shotgun = this._prepWeapon(shotgun, loadPalette(asset('models/shotgun-texture.png')));
 
     this.ready = true;
     return this;

@@ -8,6 +8,7 @@ export class Input {
     this.mouseDX = 0; this.mouseDY = 0;
     this.shootQueued = false;
     this.shooting = false;
+    this.aiming = false;        // botão direito: mira de ferro
     this.locked = false;
     this.onLockChange = null;
     this.onInteract = null;
@@ -15,7 +16,7 @@ export class Input {
     addEventListener('keydown', e => {
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (e.code === 'KeyE') this.onInteract?.();
+      if (e.code === 'KeyF') this.onInteract?.();
       if (['Space', 'ShiftLeft', 'ControlLeft', 'Tab'].includes(e.code)) e.preventDefault();
     });
     addEventListener('keyup', e => this.keys.delete(e.code));
@@ -32,10 +33,16 @@ export class Input {
       this.mouseDY += e.movementY * CFG.MOUSE_SENS;
     });
     addEventListener('mousedown', e => {
-      if (!this.locked || e.button !== 0) return;
-      this.shooting = true; this.shootQueued = true;
+      if (!this.locked) return;
+      if (e.button === 0) { this.shooting = true; this.shootQueued = true; }
+      if (e.button === 2) this.aiming = true;
     });
-    addEventListener('mouseup', e => { if (e.button === 0) this.shooting = false; });
+    addEventListener('mouseup', e => {
+      if (e.button === 0) this.shooting = false;
+      if (e.button === 2) this.aiming = false;
+    });
+    // sem isto o botão direito abre o menu do navegador no meio do tiroteio
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   lock() { this.canvas.requestPointerLock?.(); }

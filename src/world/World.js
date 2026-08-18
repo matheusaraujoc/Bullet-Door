@@ -318,17 +318,44 @@ export class World {
     return this.doors.edgeOpen(x1, y1, x2, y2) && this.doors.edgeOpen(x2, y2, x1, y1);
   }
 
-  /** A célula barra a visão? */
-  opaque(cx, cy) { return this.solid(cx, cy); }
+  /**
+   * A célula barra a VISÃO?
+   * Difere de `solid`: caixote baixo para o corpo mas não tapa o olho, que é
+   * justamente o que o torna cobertura e não parede.
+   */
+  opaque(cx, cy) {
+    const t = cellAt(this.map, cx, cy);
+    if (t === WALL) return true;
+    if (this.map.opacos.has(cy * this.map.W + cx)) return true;
+    if (t === DOOR && this.doors) return this.doors.blocksCell(cy * this.map.W + cx);
+    return false;
+  }
 
   /**
    * Empurra um círculo para fora do cenário e das folhas de porta.
-   * Resolve pelo eixo de menor penetração — barato e estável em grid.
+   *
+   * A resolução roda algumas vezes seguidas, e não uma só. Numa quina, tirar o
+   * corpo de uma parede costuma enfiá-lo na outra; com um passe único ele saía
+   * do outro lado e ficava preso dentro do bloco. O mesmo vale para a folha da
+   * porta descendo ao lado do vão: ela empurra, e é a passada seguinte que
+   * conserta o resultado contra a parede.
    */
   collide(pos, radius) {
+    let bateu = false;
+    for (let passe = 0; passe < 3; passe++) {
+      let mexeu = this._colidirCelulas(pos, radius);
+      if (this.doors?.collide(pos, radius)) mexeu = true;
+      if (mexeu) bateu = true;
+      else break;                      // nada encostou: não precisa repetir
+    }
+    return bateu;
+  }
+
+  /** Um passe de resolução contra as células sólidas em volta. */
+  _colidirCelulas(pos, radius) {
     const C = CFG.CELL, half = C / 2;
     const cx = Math.round(pos.x / C), cy = Math.round(pos.z / C);
-    let hit = false;
+    let bateu = false;
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const gx = cx + dx, gy = cy + dy;
@@ -339,20 +366,27 @@ export class World {
         const ox = pos.x - nx, oz = pos.z - nz;
         const d2 = ox * ox + oz * oz;
         if (d2 >= radius * radius) continue;
-        hit = true;
+        bateu = true;
         if (d2 > 1e-8) {
           const d = Math.sqrt(d2), push = radius - d;
           pos.x += (ox / d) * push; pos.z += (oz / d) * push;
         } else {
-          const px = half + radius - Math.abs(pos.x - bx);
-          const pz = half + radius - Math.abs(pos.z - bz);
-          if (px < pz) pos.x += Math.sign(pos.x - bx || 1) * px;
-          else pos.z += Math.sign(pos.z - bz || 1) * pz;
+          // centro dentro do bloco: sai pela face que exige menos deslocamento,
+          // mas só entre as faces que dão para espaço livre
+          const saidas = [
+            { eixo: 'x', s: 1, custo: bx + half + radius - pos.x, livre: !this.solid(gx + 1, gy) },
+            { eixo: 'x', s: -1, custo: pos.x - (bx - half - radius), livre: !this.solid(gx - 1, gy) },
+            { eixo: 'z', s: 1, custo: bz + half + radius - pos.z, livre: !this.solid(gx, gy + 1) },
+            { eixo: 'z', s: -1, custo: pos.z - (bz - half - radius), livre: !this.solid(gx, gy - 1) },
+          ].filter(o => o.livre);
+          const alvo = (saidas.length ? saidas : [{ eixo: 'x', s: 1, custo: 0 }])
+            .reduce((a, b) => (a.custo <= b.custo ? a : b));
+          if (alvo.eixo === 'x') pos.x = bx + alvo.s * (half + radius);
+          else pos.z = bz + alvo.s * (half + radius);
         }
       }
     }
-    if (this.doors?.collide(pos, radius)) hit = true;
-    return hit;
+    return bateu;
   }
 
   dispose() {

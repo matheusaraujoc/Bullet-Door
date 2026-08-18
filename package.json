@@ -7,13 +7,21 @@
     "dev": "vite --open",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tools/test-logic.mjs && node tools/test-doors.mjs",
+    "test": "node tools/test-regras.mjs && node tools/test-logic.mjs && node tools/test-doors.mjs && node tools/test-colisao.mjs",
     "test:ia": "node tools/test-ai.mjs",
     "test:partida": "node tools/match.mjs",
     "fotos": "node tools/final-shots.mjs",
     "modelos": "node tools/preview-model.mjs",
     "test:portas": "node tools/test-doors.mjs",
-    "test:fuga": "node tools/test-flee.mjs"
+    "test:fuga": "node tools/test-flee.mjs",
+    "test:intro": "node tools/test-intro.mjs",
+    "test:ui": "node tools/test-ui.mjs",
+    "test:colisao": "node tools/test-colisao.mjs",
+    "test:mira": "node tools/test-mira.mjs",
+    "test:regras": "node tools/test-regras.mjs",
+    "test:morte": "node tools/test-morte.mjs",
+    "itch": "vite build && node tools/empacotar.mjs",
+    "test:itch": "vite build && node tools/test-itch.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.0"

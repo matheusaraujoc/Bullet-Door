@@ -9,6 +9,7 @@ const LARG = CFG.CELL * 0.99;
 const T_D = 0.22;
 const SPEED = 5.2;                       // m/s de subida
 const ABERTA = 0.55;                     // fração da altura a partir da qual já dá para passar
+const ESPERA = VAO * 0.6;                // altura em que a folha segura, esperando o vão limpar
 
 const dirOf = k => DIRS.find(d => d.k === k);
 
@@ -191,8 +192,12 @@ export class Doors {
   }
 
   // ------------------------------------------------------------- interação
-  /** Porta ao alcance da mão: a célula dela ou uma colada. */
-  nearest(pos, maxDist = 3.0) {
+  /**
+   * Porta ao alcance da mão: a célula dela ou uma colada.
+   * O alcance precisa passar de uma célula inteira (3,2 m) — com 3,0 o aviso
+   * de "[E]" sumia exatamente quando o jogador parava ao lado para acionar.
+   */
+  nearest(pos, maxDist = CFG.CELL * 1.35) {
     const cx = Math.round(pos.x / CFG.CELL), cy = Math.round(pos.z / CFG.CELL);
     let best = null, bd = maxDist * maxDist;
     for (const d of this.list) {
@@ -204,48 +209,72 @@ export class Doors {
     return best;
   }
 
-  /** Alguém está debaixo desta folha? Guilhotina não desce sobre ninguém. */
+  /**
+   * Alguém está debaixo desta folha? Guilhotina não desce sobre ninguém.
+   *
+   * A conta é feita no referencial da própria folha: só conta quem está a
+   * menos de meio metro do PLANO dela. Antes isto era um quadrado de três
+   * metros e meio em volta da porta, o que barrava o fechamento de qualquer
+   * ponto de onde dava para acioná-la — na prática, a porta não fechava nunca
+   * e o jogador só via o aviso de vão ocupado.
+   */
   _livre(p, ocupantes) {
+    const meiaLarg = LARG / 2;
+    const fundo = 0.5;                       // corpo + uma folga de segurança
     for (const o of ocupantes) {
       if (!o) continue;
-      const dx = Math.abs(o.x - p.x), dz = Math.abs(o.z - p.z);
-      if (dx < CFG.CELL * 0.55 && dz < CFG.CELL * 0.55) return false;
+      const dx = o.x - p.x, dz = o.z - p.z;
+      // u corre ao longo da folha, v atravessa a espessura dela
+      const u = p.rotY === 0 ? dx : dz;
+      const v = p.rotY === 0 ? dz : dx;
+      if (Math.abs(u) < meiaLarg && Math.abs(v) < fundo) return false;
     }
     return true;
   }
 
+  /** Está debaixo desta porta agora? (para o aviso na tela) */
+  noVao(door, pos) {
+    const paineis = door.kind === 'simples' ? [door.painel] : [door.painelA, door.painelB];
+    return paineis.some(p => !this._livre(p, [pos]));
+  }
+
   /**
-   * Aciona a porta. `ocupantes` são as posições que não podem ser esmagadas —
-   * se alguém está debaixo da folha que ia descer, nada acontece.
-   * Devolve true se algo se mexeu (é o que decide se sai barulho).
+   * Aciona a porta. O comando é SEMPRE aceito.
+   *
+   * Antes, ter alguém no vão fazia a porta recusar — o que castigava
+   * exatamente quem mais precisa dela: quem está fugindo e aperta o botão em
+   * cima da passagem. Agora a folha desce e, se encontrar alguém embaixo,
+   * segura na altura de espera até o caminho limpar (ver `update`). Você aciona
+   * correndo, passa por baixo, e ela fecha atrás de você.
    */
   toggle(door, opener, ocupantes = []) {
     if (door.kind === 'simples') {
-      const p = door.painel;
-      if (door.open) {
-        if (!this._livre(p, ocupantes)) return false;    // tem gente no vão
-        door.open = false; p.alvo = 0;
-      } else {
-        door.open = true; p.alvo = VAO;
-      }
+      door.open = !door.open;
+      door.painel.alvo = door.open ? VAO : 0;
       return true;
     }
-
-    // desvio: a folha que está em cima desce e a de baixo sobe
+    // desvio: a folha de cima desce e a de baixo sobe
     const vaiFechar = door.blocking === 'A' ? door.painelB : door.painelA;
     const vaiAbrir = door.blocking === 'A' ? door.painelA : door.painelB;
-    if (!this._livre(vaiFechar, ocupantes)) return false;
     door.blocking = door.blocking === 'A' ? 'B' : 'A';
     vaiFechar.alvo = 0;
     vaiAbrir.alvo = VAO;
     return true;
   }
 
-  update(dt) {
+  /**
+   * Move as folhas. Quem está descendo e encontra alguém embaixo para na
+   * altura de espera — acima da cabeça, e alto o bastante para a passagem
+   * ainda contar como aberta — e retoma sozinha assim que o vão limpa.
+   */
+  update(dt, ocupantes = []) {
     const passo = SPEED * dt;
     for (const p of this.panels) {
-      if (p.y === p.alvo) continue;
-      const d = p.alvo - p.y;
+      let alvo = p.alvo;
+      if (alvo < p.y && !this._livre(p, ocupantes)) alvo = Math.max(alvo, ESPERA);
+      p.esperando = alvo !== p.alvo;
+      if (p.y === alvo) continue;
+      const d = alvo - p.y;
       p.y += Math.abs(d) <= passo ? d : Math.sign(d) * passo;
       this._write(p);
     }

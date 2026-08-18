@@ -388,14 +388,10 @@ export class Game {
   tryDoor() {
     if (!this.running || this.paused || !this.player.alive) return;
     if (this.rounds.state !== 'playing') return;
-    const d = this.world?.doors.nearest(this.player.pos, 3.0);
+    const d = this.world?.doors.nearest(this.player.pos);
     if (!d) return;
-    // só faz barulho se a folha realmente se mexeu
-    if (this.world.doors.toggle(d, this.player.pos, this.ocupantes())) {
-      this.onDoorUsed(d, this.player);
-    } else {
-      this.hud.feed('TEM ALGUÉM NO VÃO');
-    }
+    this.world.doors.toggle(d, this.player.pos, this.ocupantes());
+    this.onDoorUsed(d, this.player);
   }
 
   // ----------------------------------------------------------------- tiros
@@ -460,7 +456,7 @@ export class Game {
       if (this.bot && vivo) this.bot.update(dt, this.player);
       else if (this.bot) this.bot.actor.update(dt, 0, this.bot.yaw);
 
-      this.world?.doors.update(dt);
+      this.world?.doors.update(dt, this.ocupantes());
       this._updateEffects(dt);
       this._updateHud(dt, vivo);
     }
@@ -486,9 +482,12 @@ export class Game {
       this.hud.setDanger(false);
     }
 
-    const perto = vivo && this.player.alive ? this.world?.doors.nearest(this.player.pos, 3.0) : null;
-    this.hud.prompt(perto
-      ? (perto.kind === 'desvio' ? '[E] VIRAR PASSAGEM' : perto.open ? '[E] FECHAR PORTA' : '[E] ABRIR PORTA')
-      : null);
+    const perto = vivo && this.player.alive ? this.world?.doors.nearest(this.player.pos) : null;
+    let aviso = null;
+    if (perto) {
+      if (perto.kind === 'desvio') aviso = '[F] VIRAR PASSAGEM';
+      else aviso = perto.open ? '[F] FECHAR PORTA' : '[F] ABRIR PORTA';
+    }
+    this.hud.prompt(aviso);
   }
 }

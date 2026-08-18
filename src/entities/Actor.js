@@ -69,15 +69,26 @@ export class Actor {
     this.play('shoot with pistol', { fade: 0.05, once: true, lock: 0.3 });
   }
 
+  /**
+    * Morrer.
+    *
+    * O clipe de morte do modelo é discreto demais — o boneco encolhe um pouco
+    * e para de pé, e quem atirou fica sem saber se acertou. Então o clipe roda
+    * junto de uma queda própria: o corpo tomba para o lado e vai ao chão em
+    * meio segundo. É a queda que confirma o abate.
+    */
   die() {
     if (this.dead) return;
     this.dead = true;
     this.play('death', { fade: 0.1, once: true, lock: 99 });
+    this.queda = 0;
+    this.ladoQueda = Math.random() < 0.5 ? -1 : 1;
   }
 
   revive() {
     this.dead = false;
     this.locked = 0;
+    this.queda = 0;
     this.object.rotation.x = 0;
     this.object.rotation.z = 0;
     this.object.position.y = 0;
@@ -91,7 +102,16 @@ export class Actor {
   update(dt, speed, yaw) {
     this.mixer.update(dt);
     this.object.rotation.y = yaw;
-    if (this.dead) return;
+
+    if (this.dead) {
+      // tomba e assenta no chão, desacelerando no fim para não bater seco
+      this.queda = Math.min(1, (this.queda ?? 0) + dt * 2.1);
+      const k = 1 - (1 - this.queda) * (1 - this.queda);
+      this.object.rotation.z = this.ladoQueda * k * (Math.PI / 2) * 0.94;
+      this.object.rotation.x = k * 0.16;
+      this.object.position.y = -k * 0.06;      // encosta o ombro no piso
+      return;
+    }
 
     this.locked -= dt;
     if (this.locked > 0) return;
@@ -130,53 +150,79 @@ export class Actor {
 }
 
 /**
- * Clarão em cruz, no espírito do pixel art: um quadrado chapado não lê como
- * fogo saindo do cano. Duas camadas somadas (halo largo + núcleo claro) com
- * giro e tamanho sorteados a cada tiro, para nunca sair igual duas vezes.
+ * Uma estrela de clarão: pontas de comprimento irregular saindo de um miolo.
+ *
+ * A versão anterior era uma cruz de braços retos e iguais, e duas delas
+ * sobrepostas liam como um "X" desenhado na tela, não como fogo saindo do
+ * cano. Fogo não tem simetria: são as pontas desiguais que vendem a explosão.
  */
-export function crossGeometry(braco = 1, esp = 0.26) {
-  const b = braco, e = esp;
+function estrelaGeometry(pontas, sorteio) {
   const s = new THREE.Shape();
-  s.moveTo(-e, -b); s.lineTo(e, -b); s.lineTo(e, -e); s.lineTo(b, -e);
-  s.lineTo(b, e); s.lineTo(e, e); s.lineTo(e, b); s.lineTo(-e, b);
-  s.lineTo(-e, e); s.lineTo(-b, e); s.lineTo(-b, -e); s.lineTo(-e, -e);
+  let semente = sorteio;
+  const rnd = () => {
+    semente = (semente * 16807) % 2147483647;
+    return semente / 2147483647;
+  };
+  for (let i = 0; i < pontas * 2; i++) {
+    const fora = i % 2 === 0;
+    const r = fora ? 0.55 + rnd() * 0.75 : 0.16 + rnd() * 0.14;
+    const a = (i / (pontas * 2)) * Math.PI * 2 + rnd() * 0.18;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) s.moveTo(x, y); else s.lineTo(x, y);
+  }
   s.closePath();
   return new THREE.ShapeGeometry(s);
 }
 
-/** As duas camadas do clarão, prontas para pendurar em qualquer cano. */
+/**
+ * O clarão: um miolo claro e quente por dentro, uma estrela larga e alaranjada
+ * por fora. Sorteia entre algumas estrelas diferentes a cada tiro, então dois
+ * disparos seguidos nunca desenham a mesma forma.
+ */
 export function makeFlash(escala = 1) {
   const grupo = new THREE.Group();
   const mat = cor => new THREE.MeshBasicMaterial({
     color: cor, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
     blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
-  const halo = new THREE.Mesh(crossGeometry(1, 0.3), mat(0xf77622));
-  const nucleo = new THREE.Mesh(crossGeometry(0.55, 0.34), mat(0xfee761));
-  halo.renderOrder = 900; nucleo.renderOrder = 901;
-  nucleo.position.z = 0.01;
-  halo.scale.setScalar(escala);
-  nucleo.scale.setScalar(escala);
-  grupo.add(halo, nucleo);
+
+  const halos = [5, 6, 7].map((pontas, i) => {
+    const m = new THREE.Mesh(estrelaGeometry(pontas, 7919 + i * 104729), mat(0xf77622));
+    m.renderOrder = 900;
+    m.visible = false;
+    grupo.add(m);
+    return m;
+  });
+  const nucleo = new THREE.Mesh(estrelaGeometry(6, 31337), mat(0xfff0b0));
+  nucleo.renderOrder = 901;
+  nucleo.position.z = 0.012;
+  grupo.add(nucleo);
   grupo.visible = false;
+
+  let halo = halos[0];
   return {
-    grupo, halo, nucleo, escala,
+    grupo, nucleo, escala,
     disparar() {
       grupo.visible = true;
-      const g = 0.8 + Math.random() * 0.6;
-      halo.material.opacity = 0.95;
+      for (const h of halos) h.visible = false;
+      halo = halos[(Math.random() * halos.length) | 0];
+      halo.visible = true;
+
+      const g = 0.85 + Math.random() * 0.5;
+      halo.material.opacity = 0.9;
       nucleo.material.opacity = 1;
       halo.scale.setScalar(escala * g);
-      nucleo.scale.setScalar(escala * g * 0.62);
-      halo.rotation.z = Math.random() * Math.PI;
-      nucleo.rotation.z = Math.random() * Math.PI;
+      nucleo.scale.setScalar(escala * g * 0.5);
+      halo.rotation.z = Math.random() * Math.PI * 2;
+      nucleo.rotation.z = Math.random() * Math.PI * 2;
     },
     /** Some depressa: clarão que demora vira lanterna. */
     update(dt) {
       if (!grupo.visible) return;
-      const queda = dt * 10;
+      const queda = dt * 11;
       halo.material.opacity = Math.max(0, halo.material.opacity - queda);
-      nucleo.material.opacity = Math.max(0, nucleo.material.opacity - queda * 1.3);
+      // o miolo apaga antes, deixando só o rastro alaranjado por um instante
+      nucleo.material.opacity = Math.max(0, nucleo.material.opacity - queda * 1.6);
       if (halo.material.opacity <= 0) grupo.visible = false;
     },
   };
@@ -203,6 +249,8 @@ export class ViewModel {
     this.group.add(this.muzzle);
 
     this.base = new THREE.Vector3(0.3, -0.52, -0.5);
+    // mira de ferro: a arma sobe para o centro, alinhada com a linha do olho
+    this.baseAds = new THREE.Vector3(0, -0.255, -0.4);
     this.group.position.copy(this.base);
     this.group.rotation.set(0, -0.09, 0.05);
     this.baseRot = this.group.rotation.clone();
@@ -210,6 +258,10 @@ export class ViewModel {
 
     this.recoil = 0;
     this.sway = new THREE.Vector2();
+    this.fase = 0;          // fase do passo, acumulada (não deriva do relógio)
+    this.corridaK = 0;      // 0 andando, 1 em corrida aberta
+    this.passoAnt = 0;
+    this.tranco = 0;        // solavanco curto a cada pisada
   }
 
   kick() {
@@ -217,23 +269,61 @@ export class ViewModel {
     this.flash.disparar();
   }
 
-  update(dt, speed, look) {
+  /**
+   * O balanço da arma.
+   *
+   * O caminho do punho é um oito deitado: o horizontal oscila na metade da
+   * frequência do vertical, que é como o corpo de fato se move a cada passo.
+   * Um seno só, na vertical, lê como elevador — foi o que existia aqui antes.
+   *
+   * A fase é acumulada em vez de tirada do relógio: assim mudar de velocidade
+   * não faz a arma pular de posição no meio do movimento.
+   *
+   * Correr troca a POSE, não só a amplitude. Ninguém corre de arma apontada:
+   * ela desce, gira para dentro e balança bem mais.
+   */
+  update(dt, speed, look, correndo = false, ads = 0, lean = 0) {
     this.recoil = Math.max(0, this.recoil - dt * 6);
     this.flash.update(dt);
+    this.tranco = Math.max(0, this.tranco - dt * 7);
+
+    // transição suave entre a postura de andar e a de corrida
+    this.corridaK += ((correndo && speed > 1 ? 1 : 0) - this.corridaK) * Math.min(1, dt * 6);
+
+    const andando = speed > 0.4;
+    const cadencia = 2.2 + speed * 1.45;
+    if (andando) this.fase += dt * cadencia;
+    else this.fase += dt * 1.1;                    // respiração de quem está parado
+
+    // a cada pisada, um solavanco curto
+    const passo = Math.floor(this.fase / Math.PI);
+    if (andando && passo !== this.passoAnt) { this.tranco = 1; this.passoAnt = passo; }
+
+    const amp = andando ? Math.min(speed / 6.4, 1) : 0.12;
+    const oito = 1 + this.corridaK * 0.9;          // correndo, o oito abre
+    const bx = Math.sin(this.fase) * 0.02 * amp * oito;
+    const by = Math.cos(this.fase * 2) * 0.013 * amp * oito - this.tranco * 0.006;
 
     // o balanço persegue o movimento do mouse com atraso
     this.sway.x += (look.x * 0.06 - this.sway.x) * Math.min(1, dt * 9);
     this.sway.y += (look.y * 0.06 - this.sway.y) * Math.min(1, dt * 9);
 
-    const bob = speed > 0.5 ? Math.sin(performance.now() * 0.008 * speed) * 0.012 * speed / 3 : 0;
+    // mirando, o balanço quase some: é o que faz a mira de ferro valer a pena
+    const calma = 1 - ads * 0.88;
+    const k = this.corridaK * (1 - ads);
+
+    const px = this.base.x + (this.baseAds.x - this.base.x) * ads;
+    const py = this.base.y + (this.baseAds.y - this.base.y) * ads;
+    const pz = this.base.z + (this.baseAds.z - this.base.z) * ads;
+
     this.group.position.set(
-      this.base.x - this.sway.x,
-      this.base.y - this.sway.y + bob - this.recoil * 0.02,
-      this.base.z + this.recoil * 0.07);
+      px - (this.sway.x - bx) * calma + k * 0.06 - lean * 0.05,
+      py - (this.sway.y - by) * calma - this.recoil * 0.02 - k * 0.12,
+      pz + this.recoil * 0.07 + k * 0.1);
     this.group.rotation.set(
-      this.baseRot.x + this.recoil * 0.3 + this.sway.y * 0.4,
-      this.baseRot.y - this.sway.x * 0.5,
-      this.baseRot.z);
+      this.baseRot.x * (1 - ads) + this.recoil * 0.3 + (this.sway.y * 0.4 + by * 1.2) * calma + k * 0.55,
+      this.baseRot.y * (1 - ads) - this.sway.x * 0.5 * calma + k * 0.42,
+      this.baseRot.z * (1 - ads) + (k * 0.3 + bx * 2.2) * calma + lean * 0.12);
   }
 
   set visible(v) { this.group.visible = v; }

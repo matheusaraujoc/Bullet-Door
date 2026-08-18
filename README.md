@@ -6,6 +6,25 @@ Você caça por 30 segundos, depois foge por 30. Melhor de três.
 **Para jogar: clique duas vezes em `JOGAR.bat`.** Ele instala o que falta na
 primeira vez e abre o navegador sozinho.
 
+## Identidade
+
+A abertura da **Kountera Games** é a assinatura do estúdio e roda antes de
+tudo: a marca surge com o `kountera_games.mp3`, o brilho metálico atravessa
+com o `metalico.mp3`, e a tela passa para o jogo. Ela é do estúdio, não do
+jogo — é a mesma que abriria qualquer outro título da casa.
+
+A cara do **Bullet Door** vem de outro lugar: da planta dos mapas. O fundo do
+menu não é textura decorativa, é um mapa **de verdade**, gerado na hora pelo
+mesmo código que monta a partida, desenhado em planta baixa — com as portas
+piscando e duas linhas, vermelha e ciano, se perseguindo pelos corredores.
+Cada vez que o jogo abre, a planta é outra. A marca fecha a ideia: uma
+guilhotina listrada caindo entre BULLET e DOOR, que é literalmente a porta do
+jogo. As cores são as dos dois papéis — vermelho caçador, ciano fugitivo,
+laranja para porta e ação — todas tiradas da paleta do próprio mundo.
+
+Se você puser `public/images/Kountera_Games_Logo.png`, a abertura usa a
+imagem; sem ela, a marca sai em tipografia.
+
 ## A regra que amarra tudo
 
 Uma rodada tem duas metades. Ganha a rodada **quem eliminou mais rápido**.
@@ -24,9 +43,19 @@ natural da partida.
 | `W` `A` `S` `D` | mover |
 | `SHIFT` | correr (faz barulho longe) |
 | `CTRL` ou `C` | agachar (silencioso, e mais difícil de ver) |
-| `E` | abrir/fechar porta, virar passagem |
-| clique | atirar (munição infinita, 0,7 s entre tiros) |
+| `Q` `E` | espiar pela esquerda / direita |
+| `F` | abrir e fechar portas |
+| clique esquerdo | atirar (munição infinita, 0,7 s entre tiros) |
+| clique direito | mira de ferro |
 | `ESC` | pausar |
+
+**Espiar** tira só a cabeça para o lado, sem expor o corpo: dá para conferir um
+corredor antes de entrar nele. A câmera para onde a parede manda parar — num
+canto apertado você vê menos, como seria de esperar.
+
+**A mira de ferro** fecha o ângulo de visão, quase zera o balanço da arma e
+deixa o mouse mais manso. Em troca, o passo encurta e não dá para correr: é
+troca de mobilidade por precisão, para quando o alvo está longe.
 
 ## As portas
 
@@ -38,6 +67,10 @@ Nenhuma folha desce sobre quem está embaixo: o acionamento simplesmente recusa.
 Existem em dois tipos:
 
 - **Porta de sala** — sobe e desce. Fechada, corta passagem e visão.
+  O comando é sempre aceito: se alguém está no vão, a folha **segura no alto e
+  desce sozinha assim que o caminho limpa**. Você aciona correndo, passa por
+  baixo, e ela fecha atrás de você — recusar o comando castigava justamente
+  quem mais precisa dela.
 - **Porta de desvio** — duas folhas numa junção: quando uma desce, a outra
   sobe. Há sempre um caminho aberto e outro fechado, e é isso que faz o mapa
   se reconfigurar no meio da caçada.
@@ -62,6 +95,11 @@ Cada bloco sorteia o que vai ser: sala fechada com portas, sala com um canto
 recortado, ou **pátio** — um bloco escancarado, sem paredes, que muda
 completamente como aquele pedaço se joga. Alguns trechos de corredor nascem
 com o dobro da largura, criando avenidas de visão longa.
+
+Dentro das salas há dois patamares de cobertura, e os dois têm corpo: o
+**pilar** tampa passagem e visão; o **caixote** para o corpo mas não o olho —
+é atrás dele que você se agacha e continua enxergando. Nenhum dos dois nasce
+perto de porta ou em passagem estreita, para não virar rolha.
 
 Cada sala tem cor e luz próprias (paleta Endesga 32, a mesma dos modelos), o
 que serve de ponto de referência: em 30 segundos dá para decorar "a sala
@@ -106,8 +144,14 @@ servidor rodando.
 ```bash
 npm run dev            # servidor de desenvolvimento
 npm test               # mapa, navegação, portas e rodadas (sem navegador)
-npm run test:portas    # nenhuma folha pode descer sobre quem está no vão
+npm run test:portas    # nenhuma folha desce sobre quem está no vão
+npm run test:regras    # papéis, placar e desfecho, inclusive 2000 partidas ao acaso
+npm run test:colisao   # ninguém termina dentro de parede, nem com a porta descendo
+npm run test:morte     # o corpo cai de verdade quando abatido
+npm run test:mira      # mira de ferro e visada pelos cantos
 npm run test:fuga      # o bot foge mesmo ao bater o olho no caçador
+npm run test:intro     # a abertura roda uma vez, pede os dois áudios e sai
+npm run test:ui        # fotografa menu e HUD para conferência
 npm run test:ia        # mede a taxa de captura do caçador em 30s simulados
 npm run test:partida   # joga uma partida inteira num navegador headless
 npm run fotos          # capturas do jogo em tools/
@@ -122,6 +166,31 @@ detalhes têm motivo: no Windows, subir por shell encadeia cmd → npx → node 
 `kill` encerra só o cmd, deixando o servidor pendurado; e um servidor
 pendurado com `open` ligado abre abas do jogo no navegador de quem estiver
 usando a máquina — uma delas chega a capturar o ponteiro do mouse.
+
+## Publicar na web (itch.io)
+
+```bash
+npm run itch          # build + bullet-door-web.zip, pronto para subir
+npm run test:itch     # confere o build servido de uma subpasta, dentro de iframe
+```
+
+O pacote sai com **cerca de 0,4 MB**. No itch.io: projeto do tipo **HTML**,
+subir o zip, marcar *"This file will be played in the browser"*, viewport
+**1280×720** com o botão de tela cheia ligado, e *mobile friendly* desmarcado —
+o jogo é de mouse e teclado.
+
+Dois detalhes que fazem o jogo funcionar lá e que é fácil quebrar sem perceber:
+
+- **Caminhos relativos.** O portal serve o jogo de uma subpasta funda, então
+  tudo é resolvido a partir do `index.html` (`base: './'` no Vite e o helper
+  `asset()` para os arquivos de `public/`). Com caminho absoluto o navegador
+  procuraria `/models` na raiz do domínio e a tela abriria preta.
+- **O clique de entrada.** Navegador nenhum toca áudio antes de uma interação,
+  e a abertura depende de dois sons entrando na hora certa.
+
+`npm run test:itch` sobe o build numa subpasta dentro de um iframe com o mesmo
+sandbox do portal e confere que os modelos chegam, a partida começa e a cena é
+desenhada — é o ensaio da publicação.
 
 ## Como está montado
 

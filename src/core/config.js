@@ -28,6 +28,14 @@ export const CFG = {
   // --- arma (munição infinita, o limite é a cadência) ---
   FIRE_COOLDOWN: 0.7,
   RANGE: 70,
+  FOV: 80,
+  FOV_ADS: 52,          // mira de ferro: fecha o ângulo e aproxima
+  ADS_SENS: 0.5,        // e o mouse fica mais manso, para mirar de longe
+  ADS_SPEED: 0.55,      // mirando, o passo encurta
+
+  // --- visada pelos cantos ---
+  LEAN_DIST: 0.62,      // quanto a cabeça sai para o lado, em metros
+  LEAN_ROLL: 0.2,       // inclinação da imagem, em radianos
 
   // --- ruído: raio em metros em que o som é percebido ---
   NOISE: {

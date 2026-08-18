@@ -48,7 +48,12 @@ function fakeWorld(map, { abertas = false, desvioEmB = false } = {}) {
       if (this.staticSolid(x, y)) return true;
       return cellAt(map, x, y) === DOOR && doors.blocksCell(y * map.W + x);
     },
-    opaque(x, y) { return this.solid(x, y); },
+    opaque(x, y) {
+      const t = cellAt(map, x, y);
+      if (t === WALL) return true;
+      if (map.opacos.has(y * map.W + x)) return true;
+      return t === DOOR && doors.blocksCell(y * map.W + x);
+    },
     edgeOpen(x1, y1, x2, y2) {
       if (this.solid(x2, y2)) return false;
       return doors.edgeOpen(x1, y1, x2, y2) && doors.edgeOpen(x2, y2, x1, y1);
@@ -304,14 +309,20 @@ function simulate(killAt, maxSteps = 60000) {
 }
 
 {
+  // A ordem é fixa: você caça a primeira metade e foge a segunda, em toda
+  // rodada. Alternar quem começa a cada rodada fazia o mesmo lado caçar duas
+  // vezes seguidas na virada. A alternância completa é conferida em
+  // tools/test-regras.mjs, que acompanha a partida inteira.
   const g = fakeGame();
   const rm = new RoundManager(g);
   rm.startMatch();
-  ok(rm.playerRoleThisHalf === 'hunter', 'rodada 1 começa com você caçando');
-  rm.round = 2; rm.half = 0;
-  ok(rm.playerRoleThisHalf === 'runner', 'rodada 2 começa com o bot caçando');
-  rm.half = 1;
-  ok(rm.playerRoleThisHalf === 'hunter', 'a segunda metade inverte');
+  for (const rodada of [1, 2, 3]) {
+    rm.round = rodada;
+    rm.half = 0;
+    ok(rm.playerRoleThisHalf === 'hunter', `rodada ${rodada}: a primeira metade é de caça`);
+    rm.half = 1;
+    ok(rm.playerRoleThisHalf === 'runner', `rodada ${rodada}: a segunda metade é de fuga`);
+  }
 }
 {
   const g = fakeGame();

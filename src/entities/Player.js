@@ -31,8 +31,13 @@ export class Player {
     this.recoil = 0;
     this.bob = 0;
     this.speed = 0;
+    this.correndo = false;
     this.lastLook = new THREE.Vector2();
     this.deathTilt = 0;
+    this.ads = 0;            // 0 pela cintura, 1 na mira de ferro
+    this.lean = 0;           // -1 espiando pela esquerda, +1 pela direita
+    this.leanReal = 0;       // o quanto a parede deixou inclinar de fato
+    this._tmp = new THREE.Vector3();
 
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = CFG.RANGE;
@@ -74,8 +79,9 @@ export class Player {
 
     // ---- olhar ----
     const m = inp.takeMouse();
-    this.yaw -= m.x;
-    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - m.y));
+    const sens = 1 - this.ads * (1 - CFG.ADS_SENS);
+    this.yaw -= m.x * sens;
+    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - m.y * sens));
     this.lastLook.set(m.x / Math.max(dt, 0.001) * 0.02, m.y / Math.max(dt, 0.001) * 0.02);
 
     // ---- intenção de movimento ----
@@ -87,14 +93,25 @@ export class Player {
     const len = Math.hypot(fwd, side);
     if (len > 0) { fwd /= len; side /= len; }
 
+    // mira de ferro no botão direito: fecha o ângulo, alenta o mouse e o passo
+    const querMirar = inp.aiming && this.role === 'hunter';
+    this.ads += ((querMirar ? 1 : 0) - this.ads) * Math.min(1, dt * 11);
+
+    // espiar o canto sem expor o corpo
+    const leanAlvo = (inp.down('KeyE') ? 1 : 0) - (inp.down('KeyQ') ? 1 : 0);
+    this.lean += (leanAlvo - this.lean) * Math.min(1, dt * 9);
+
     this.crouching = inp.down('ControlLeft') || inp.down('KeyC');
-    const querCorrer = (inp.down('ShiftLeft') || inp.down('ShiftRight')) && !this.crouching && len > 0;
+    const querCorrer = (inp.down('ShiftLeft') || inp.down('ShiftRight'))
+      && !this.crouching && len > 0 && this.ads < 0.4;   // não se corre de arma no olho
     const correndo = querCorrer && this.stamina > 0.05;
+    this.correndo = correndo;
 
     if (correndo) this.stamina = Math.max(0, this.stamina - dt);
     else this.stamina = Math.min(CFG.STAMINA_MAX, this.stamina + dt * CFG.STAMINA_REGEN);
 
-    const alvo = this.crouching ? CFG.SPEED_CROUCH : correndo ? CFG.SPEED_RUN : CFG.SPEED_WALK;
+    let alvo = this.crouching ? CFG.SPEED_CROUCH : correndo ? CFG.SPEED_RUN : CFG.SPEED_WALK;
+    alvo *= 1 - this.ads * (1 - CFG.ADS_SPEED);
 
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     const wishX = (-sin * fwd + cos * side);
@@ -132,6 +149,19 @@ export class Player {
     this._applyCamera(dt);
   }
 
+  /**
+    * Quanto dá para inclinar sem enfiar a cabeça na parede.
+    * Testa o ponto de destino contra o cenário e devolve o que sobrou — assim
+    * espiar um canto apertado mostra só o que caberia de fato.
+    */
+  _leanPossivel(quanto) {
+    if (!this.world || Math.abs(quanto) < 0.001) return 0;
+    const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+    const t = this._tmp.set(this.pos.x + rx * quanto, 0, this.pos.z + rz * quanto);
+    this.world.collide(t, 0.24);
+    return (t.x - this.pos.x) * rx + (t.z - this.pos.z) * rz;   // sobra no eixo lateral
+  }
+
   _applyCamera(dt) {
     const alvoEye = this.crouching ? CFG.CROUCH_H : CFG.EYE_H;
     if (this.alive) this.eye += (alvoEye - this.eye) * Math.min(1, dt * 12);
@@ -145,13 +175,29 @@ export class Player {
     const bobY = Math.sin(this.bob * 2) * Math.min(this.speed / 8, 0.05);
     const bobX = Math.cos(this.bob) * Math.min(this.speed / 10, 0.035);
 
-    this.camera.position.set(this.pos.x + bobX, this.eye + bobY, this.pos.z);
+    // a cabeça sai para o lado, mas só até onde a parede deixa
+    this.leanReal = this._leanPossivel(this.lean * CFG.LEAN_DIST);
+    const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+
+    this.camera.position.set(
+      this.pos.x + bobX + rx * this.leanReal,
+      this.eye + bobY - Math.abs(this.leanReal) * 0.12,   // encolhe um pouco ao espiar
+      this.pos.z + rz * this.leanReal);
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotateOnWorldAxis(UP, this.yaw);
-    this.camera.rotateX(this.pitch + this.recoil * 0.075);
-    if (this.deathTilt) this.camera.rotateZ(this.deathTilt);
+    this.camera.rotateX(this.pitch + this.recoil * 0.075 * (1 - this.ads * 0.55));
+    const roll = -(this.leanReal / CFG.LEAN_DIST) * CFG.LEAN_ROLL;
+    if (roll || this.deathTilt) this.camera.rotateZ(roll + this.deathTilt);
 
-    this.vm?.update(dt, this.speed, this.lastLook);
+    // fechar o ângulo é o que dá a sensação de aproximar na mira de ferro
+    const fovAlvo = CFG.FOV - (CFG.FOV - CFG.FOV_ADS) * this.ads;
+    if (Math.abs(this.camera.fov - fovAlvo) > 0.01) {
+      this.camera.fov = fovAlvo;
+      this.camera.updateProjectionMatrix();
+    }
+
+    this.vm?.update(dt, this.speed, this.lastLook, this.correndo, this.ads, this.lean);
+    document.body.classList.toggle('mirando', this.ads > 0.5);
   }
 
   shoot() {

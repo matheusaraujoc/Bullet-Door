@@ -1,13 +1,18 @@
 # Dependências: reinstaláveis a partir do package-lock.json
 node_modules/
 
-# Saída do build (npm run build)
+# Saída do build (npm run build) e o pacote de publicação (npm run itch)
 dist/
+*.zip
 
-# Capturas que os scripts de teste geram em tools/.
-# O padrão é só imagem: tools/_servidor.mjs também começa com "_" e é código.
+# Sobras dos scripts de teste em tools/.
+# Só imagens e arquivos temporários: tools/_servidor.mjs começa com "_" e é
+# código de verdade, usado por todos os testes de navegador.
 tools/_*.png
+tools/_*.jpg
 tools/_debug*
+tools/_patch*
+tools/_tmp*
 
 # Logs e caches de ferramenta
 *.log
@@ -16,12 +21,14 @@ yarn-debug.log*
 yarn-error.log*
 .npm/
 .vite/
+vite.config.js.timestamp-*
 .eslintcache
 
 # Variáveis de ambiente
 .env
 .env.*
 !.env.example
+*.local
 
 # Editores
 .vscode/
@@ -36,5 +43,11 @@ desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# Os modelos e sons FICAM versionados de propósito: sem eles o jogo não roda
-# depois de um clone, e juntos dão pouco mais de 1 MB.
+# ---------------------------------------------------------------------------
+# Fica versionado de propósito:
+#   models/        os FBX e texturas originais
+#   public/models/ a cópia servida ao navegador, com nomes normalizados
+#   public/audios/ os sons da abertura
+#   audios/        os originais desses sons
+# São pouco mais de 1 MB no total, e sem eles o jogo não roda depois de um
+# clone — o loader busca tudo por caminho fixo em /models e /audios.
