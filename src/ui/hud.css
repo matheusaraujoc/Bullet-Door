@@ -11,6 +11,16 @@
  * A regra de composição é uma só: informação vive DENTRO de um painel, nunca
  * solta flutuando sobre a cena. É isso que separa um HUD de um amontoado de
  * caixinhas.
+ *
+ * A regra de tipografia: nada abaixo de 12px, peso 700 no que informa, e
+ * espaçamento de letra curto. Texto fino, minúsculo e esparramado pode parecer
+ * elegante numa imagem parada, mas num jogo ele é lido de relance, em
+ * movimento, sobre um cenário colorido — e ali ele simplesmente some.
+ *
+ * E a regra de forma: canto redondo em tudo. Os chanfros de antes eram
+ * recortados com `clip-path`, o que corta a borda junto e deixa a caixa com
+ * cara de adesivo picotado. `border-radius` mantém o contorno inteiro dando a
+ * volta, e o painel passa a parecer um objeto, não um retalho.
  */
 :root {
   /* As cores saem da paleta do próprio mundo 3D (Endesga 32). O vermelho e o
@@ -21,22 +31,40 @@
   --laranja:    #f77622;
   --laranja-lt: #feae34;
   --laranja-dp: #7a3a06;
-  --hunter:     #e43b44;
+  --hunter:     #ff5a63;
   --runner:     #2ce8f5;
   --preto:      #08080e;
   --carvao:     #12131c;
-  --painel:     rgba(8, 8, 14, .82);
-  --borda:      rgba(139, 155, 180, .26);
-  --marfim:     #c0cbdc;
-  --fumaca:     rgba(192, 203, 220, .45);
-  --chanfro:    polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  --painel:     rgba(9, 10, 18, .88);
+  --borda:      rgba(150, 168, 196, .42);
+  --marfim:     #eef3fb;
+  --fumaca:     rgba(214, 226, 242, .78);
+
+  /*
+   * O acento é a cor do papel da metade em curso, e o corpo troca ele a cada
+   * virada. Um só nome, usado por painel, borda e brilho: é o que faz a tela
+   * inteira mudar de temperatura quando você deixa de caçar e passa a fugir,
+   * sem precisar recolorir peça por peça.
+   */
+  --acento:     #feae34;
+  --acento-br:  rgba(254, 174, 52, .5);
+  --acento-sw:  rgba(254, 174, 52, .16);
+
+  /* A marca acompanha a MENOR das duas dimensões: numa tela baixa e larga ela
+     precisa ceder pela altura, senão empurra o resto do menu para fora. */
+  --tam-marca:  max(38px, min(6.8vw, 9.2vh, 70px));
+
+  --raio:       16px;
+  --raio-sm:    9px;
   --fonte:      "Rajdhani", "Bahnschrift", "DIN Alternate", "Segoe UI", system-ui, sans-serif;
 }
+body.hunter { --acento: #ff5a63; --acento-br: rgba(255, 90, 99, .55); --acento-sw: rgba(255, 90, 99, .17); }
+body.runner { --acento: #2ce8f5; --acento-br: rgba(44, 232, 245, .5);  --acento-sw: rgba(44, 232, 245, .15); }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
   height: 100%; overflow: hidden; background: var(--preto);
-  color: var(--marfim); font-family: var(--fonte); font-weight: 600;
+  color: var(--marfim); font-family: var(--fonte); font-weight: 700;
   -webkit-user-select: none; user-select: none; -webkit-font-smoothing: antialiased;
 }
 canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
@@ -45,29 +73,41 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 /* painel: a única caixa do jogo, usada em todo lugar */
 .painel {
   background: var(--painel);
-  border: 1px solid var(--borda);
-  clip-path: var(--chanfro);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  border: 2px solid var(--acento-br);
+  border-radius: var(--raio);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .5), inset 0 0 26px var(--acento-sw);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 /* ============================== HUD ============================== */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 
 /* mira: quatro traços curtos, com um ponto no meio */
+/*
+ * A mira é branca, e continua branca.
+ *
+ * Ela é o único elemento que fica exatamente onde os olhos estão o tempo todo,
+ * então não pode participar da troca de cor dos papéis: o branco lê contra o
+ * cenário inteiro, e uma mira vermelha some justamente sobre o que é vermelho.
+ */
 #crosshair {
-  position: absolute; left: 50%; top: 50%; width: 24px; height: 24px;
+  position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
   transform: translate(-50%, -50%); transition: transform .12s ease;
+  color: var(--marfim);
 }
 #crosshair::after {
-  content: ""; position: absolute; left: 11px; top: 11px; width: 2px; height: 2px;
-  background: var(--marfim); box-shadow: 0 0 0 1px rgba(5,4,3,.9);
+  content: ""; position: absolute; left: 11px; top: 11px; width: 4px; height: 4px;
+  border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px rgba(5,4,3,.9);
 }
-#crosshair span { position: absolute; background: var(--marfim); box-shadow: 0 0 0 1px rgba(5,4,3,.75); }
-#crosshair span:nth-child(1), #crosshair span:nth-child(2) { width: 2px; height: 7px; left: 11px; }
+#crosshair span {
+  position: absolute; background: currentColor; border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(5,4,3,.8);
+}
+#crosshair span:nth-child(1), #crosshair span:nth-child(2) { width: 3px; height: 8px; left: 11.5px; }
 #crosshair span:nth-child(1) { top: 0; }
 #crosshair span:nth-child(2) { bottom: 0; }
-#crosshair span:nth-child(3), #crosshair span:nth-child(4) { height: 2px; width: 7px; top: 11px; }
+#crosshair span:nth-child(3), #crosshair span:nth-child(4) { height: 3px; width: 8px; top: 11.5px; }
 #crosshair span:nth-child(3) { left: 0; }
 #crosshair span:nth-child(4) { right: 0; }
 #crosshair.wide { transform: translate(-50%, -50%) scale(1.6); }
@@ -77,41 +117,69 @@ body.mirando #crosshair { opacity: 0; }
 
 /* ---- topo: papel, relógio e a régua da fase, num painel só ---- */
 #top { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; }
-#top .painel { padding: 8px 30px 0; min-width: 264px; }
+#top .painel { padding: 9px 32px 0; min-width: 280px; overflow: hidden; }
 
 #role {
-  font-size: 12px; letter-spacing: .52em; font-weight: 700;
-  text-indent: .52em; color: var(--laranja-lt);
+  font-size: 18px; letter-spacing: .16em; font-weight: 700;
+  text-indent: .16em; color: var(--acento);
+  text-shadow: 0 0 16px var(--acento-br);
 }
 #timer {
-  font-size: 52px; font-weight: 700; letter-spacing: .04em; line-height: 1.02;
+  font-size: 58px; font-weight: 700; letter-spacing: .03em; line-height: 1.02;
   font-variant-numeric: tabular-nums;
 }
-/* régua fina colada na base do painel, e não uma barra solta */
-#phasebar { height: 3px; margin: 6px -30px 0; background: rgba(247,102,22,.14); overflow: hidden; }
+/* régua colada na base do painel, e não uma barra solta */
+#phasebar {
+  height: 7px; margin: 8px -32px 0; background: rgba(255, 255, 255, .09); overflow: hidden;
+}
 #phasebar i {
   display: block; height: 100%; width: 100%; transform-origin: left;
   background: currentColor; transition: transform .12s linear;
+  box-shadow: 0 0 12px currentColor;
 }
 #objective {
-  margin-top: 7px; font-size: 11px; letter-spacing: .28em; color: var(--fumaca);
+  margin-top: 10px; font-size: 15px; font-weight: 700;
+  letter-spacing: .08em; color: var(--marfim);
+  background: var(--painel); border: 2px solid var(--acento-br);
+  border-radius: 999px; padding: 7px 20px; display: inline-block;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .45), inset 0 0 20px var(--acento-sw);
 }
 
 body.hunter #phasebar { color: var(--hunter); }
 body.runner #phasebar { color: var(--runner); }
-body.hunter #role { color: var(--hunter); }
-body.runner #role { color: var(--runner); }
 #timer.urgent { color: var(--hunter); animation: pulsar .6s ease-in-out infinite; }
 @keyframes pulsar { 50% { opacity: .5; } }
 
 /* ---- placar ---- */
 #score { position: absolute; top: 18px; right: 22px; }
-#score .painel { padding: 8px 16px 10px; text-align: center; }
-.s-round { font-size: 10px; letter-spacing: .34em; color: var(--fumaca); margin-bottom: 4px; }
-.s-linha { display: flex; align-items: baseline; gap: 7px; }
-.s-lab { font-size: 10px; letter-spacing: .18em; color: var(--fumaca); }
-.s-val { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.s-x { color: var(--borda); font-size: 14px; margin: 0 2px; }
+#score .painel { padding: 10px 20px 12px; text-align: center; }
+.s-round {
+  font-size: 14px; font-weight: 700; letter-spacing: .08em;
+  color: var(--acento); margin-bottom: 7px;
+}
+.s-linha { display: flex; align-items: baseline; gap: 9px; justify-content: center; }
+.s-lab { font-size: 14px; font-weight: 700; letter-spacing: .08em; color: var(--fumaca); }
+.s-val {
+  font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--marfim); line-height: 1;
+}
+.s-x { color: rgba(150, 168, 196, .5); font-size: 17px; margin: 0 2px; }
+
+/*
+ * O rótulo do placar.
+ *
+ * "1 — 0" sozinho não diz nada: pode ser rodada, ponto ou vida. Uma linha
+ * estática embaixo resolve, e por ser estática não compete por atenção com o
+ * que está mudando na tela — que era o problema do painel de tempos que ficava
+ * aqui antes, com título, dois rótulos e dois relógios correndo.
+ */
+.s-nota {
+  margin-top: 8px; padding-top: 8px; border-top: 2px solid rgba(150, 168, 196, .28);
+  font-size: 12px; font-weight: 700; letter-spacing: .05em;
+  color: rgba(214, 226, 242, .6); white-space: nowrap;
+}
+/* quem está na frente acende, para responder de relance quem está ganhando */
+.s-val.lidera { color: var(--laranja-lt); text-shadow: 0 0 18px rgba(254, 174, 52, .55); }
 
 /* ---- setas de direção do oponente ---- */
 #noisering { position: absolute; inset: 0; }
@@ -121,7 +189,7 @@ body.runner #role { color: var(--runner); }
   opacity: 0; will-change: transform, opacity; overflow: visible;
 }
 #noisering .blip polygon {
-  fill: var(--hunter); stroke: rgba(5,4,3,.9); stroke-width: 3; stroke-linejoin: miter;
+  fill: var(--hunter); stroke: rgba(5,4,3,.9); stroke-width: 3; stroke-linejoin: round;
   paint-order: stroke fill;
 }
 body.runner #noisering .blip polygon { fill: var(--runner); }
@@ -134,44 +202,50 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
 /* ---- aviso de porta ---- */
 #prompt {
   position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
-  font-size: 12px; letter-spacing: .26em; padding: 7px 16px;
-  background: var(--painel); border: 1px solid var(--borda); clip-path: var(--chanfro);
-  color: var(--laranja-lt);
+  font-size: 17px; font-weight: 700; letter-spacing: .07em; padding: 10px 22px;
+  background: var(--painel); border: 2px solid rgba(254, 174, 52, .55);
+  border-radius: 999px; color: var(--laranja-lt);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .5), inset 0 0 22px rgba(254, 174, 52, .14);
 }
 
 /* ---- arma: munição infinita, o limite é a cadência ---- */
 #weapon { position: absolute; right: 26px; bottom: 22px; text-align: right; }
 #weapon b {
-  font-size: 26px; font-weight: 700; letter-spacing: .06em; color: var(--marfim);
-  display: block; line-height: 1;
+  font-size: 36px; font-weight: 700; letter-spacing: .06em; color: var(--laranja-lt);
+  display: block; line-height: 1; text-shadow: 0 0 20px rgba(254, 174, 52, .45);
 }
 #cooldown {
-  display: block; width: 70px; height: 3px; margin-top: 7px; margin-left: auto;
-  background: rgba(247,102,22,.16); position: relative; overflow: hidden;
+  display: block; width: 84px; height: 7px; margin-top: 9px; margin-left: auto;
+  background: rgba(247,102,22,.2); border-radius: 999px;
+  position: relative; overflow: hidden;
 }
 #cooldown::after {
-  content: ""; position: absolute; inset: 0; background: var(--laranja);
+  content: ""; position: absolute; inset: 0; border-radius: 999px;
+  background: linear-gradient(90deg, var(--laranja), var(--laranja-lt));
   transform: scaleX(var(--cd, 0)); transform-origin: left;
 }
 
 /* ---- fôlego ---- */
 #stamina {
-  position: absolute; left: 26px; bottom: 24px; width: 116px; height: 3px;
-  background: rgba(247,102,22,.16); opacity: 0; transition: opacity .25s ease;
+  position: absolute; left: 26px; bottom: 24px; width: 132px; height: 7px;
+  background: rgba(255, 255, 255, .12); border-radius: 999px; overflow: hidden;
+  opacity: 0; transition: opacity .25s ease;
 }
 #stamina.show { opacity: 1; }
 #stamina i {
-  display: block; height: 100%; background: var(--marfim);
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--runner), #9df3fa);
   transform-origin: left; transition: transform .1s linear;
 }
-#stamina.low i { background: var(--hunter); }
+#stamina.low i { background: linear-gradient(90deg, var(--hunter), #ffa8ad); }
 
 /* ---- avisos passageiros ---- */
-#killfeed { position: absolute; left: 50%; top: 152px; transform: translateX(-50%); text-align: center; }
+#killfeed { position: absolute; left: 50%; top: 168px; transform: translateX(-50%); text-align: center; }
 #killfeed div {
-  font-size: 11px; letter-spacing: .3em; margin-bottom: 5px; padding: 5px 14px;
-  background: var(--painel); border: 1px solid var(--borda); clip-path: var(--chanfro);
-  color: var(--laranja-lt); animation: subir 2.6s ease-out forwards;
+  font-size: 15px; font-weight: 700; letter-spacing: .07em; margin-bottom: 7px; padding: 8px 20px;
+  background: var(--painel); border: 2px solid var(--acento-br); border-radius: 999px;
+  color: var(--acento); animation: subir 2.6s ease-out forwards;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .45);
 }
 @keyframes subir {
   0% { opacity: 0; transform: translateY(7px); }
@@ -180,28 +254,103 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
   100% { opacity: 0; }
 }
 
+/*
+ * Aviso de que o ponteiro está preso.
+ * Um jogo que captura o mouse precisa dizer como devolvê-lo: quem não sabe
+ * acha que o computador travou, e não é raro fechar a aba no susto.
+ */
+#dicaMouse {
+  position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%);
+  font-size: 14px; font-weight: 700; letter-spacing: .06em; color: var(--fumaca);
+  background: var(--painel); border: 2px solid var(--borda);
+  border-radius: 999px; padding: 8px 20px;
+  animation: sumirDica 6s ease-out forwards;
+}
+#dicaMouse kbd {
+  min-width: 0; padding: 3px 9px; margin-right: 8px; font-size: 13px;
+}
+@keyframes sumirDica {
+  0% { opacity: 0; } 10% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; }
+}
+
 #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 #vignette {
   position: absolute; inset: 0; pointer-events: none;
   box-shadow: inset 0 0 170px 12px rgba(5,4,3,.62); transition: box-shadow .35s ease;
 }
-body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(228,59,68,.42); }
+body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42); }
 
 /* ---- mensagem grande ---- */
 #bigmsg {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; background: rgba(5,4,3,.58);
 }
-.bm-sub { font-size: 12px; letter-spacing: .58em; color: var(--fumaca); margin-bottom: 14px; }
-.bm-main {
-  font-size: 62px; font-weight: 700; letter-spacing: .1em; line-height: 1; text-align: center;
-  padding: 14px 40px; background: var(--painel);
-  border: 1px solid var(--borda); clip-path: var(--chanfro);
+.bm-sub {
+  font-size: 18px; font-weight: 700; letter-spacing: .16em;
+  color: var(--fumaca); margin-bottom: 18px;
 }
-#bigmsg.hunter .bm-main { color: var(--hunter); }
-#bigmsg.runner .bm-main { color: var(--runner); }
+.bm-main {
+  font-size: 68px; font-weight: 700; letter-spacing: .06em; line-height: 1; text-align: center;
+  padding: 18px 48px; background: var(--painel);
+  border: 3px solid var(--acento-br); border-radius: 24px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, .55), inset 0 0 40px var(--acento-sw);
+}
+#bigmsg.hunter .bm-main { color: var(--hunter); border-color: rgba(255, 90, 99, .6); }
+#bigmsg.runner .bm-main { color: var(--runner); border-color: rgba(44, 232, 245, .55); }
 #bigmsg.pop .bm-main { animation: surgir .34s cubic-bezier(.2,1.4,.4,1); }
 @keyframes surgir { from { transform: scale(.72); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ====================== BOTÕES DO CANTO ====================== */
+/*
+ * Tela cheia, som e música. Alto à esquerda porque o alto à direita é do
+ * placar. Ficam por cima de tudo e sempre visíveis: desligar o som é coisa que
+ * se quer fazer no segundo em que alguém entra na sala.
+ */
+#canto {
+  position: fixed; top: 14px; left: 14px; z-index: 40;
+  display: flex; gap: 8px;
+}
+.bt-canto {
+  width: 40px; height: 40px; padding: 0; margin: 0;
+  background: rgba(9, 10, 18, .8);
+  border: 2px solid rgba(150, 168, 196, .34);
+  border-radius: 12px; box-shadow: none;
+  cursor: pointer; display: grid; place-items: center;
+  color: #c9d5e8;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
+}
+.bt-canto:hover {
+  background: rgba(247, 118, 34, .2); border-color: var(--laranja);
+  color: var(--laranja-lt); transform: none; filter: none;
+}
+.bt-canto:active { transform: translateY(1px); }
+.bt-canto svg { width: 22px; height: 22px; display: block; }
+.bt-canto svg .corpo {
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.bt-canto svg .onda {
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+}
+
+/* o traço cortado é o desenho universal de "desligado" — some quando ligado */
+.bt-canto svg .corte {
+  stroke: currentColor; stroke-width: 2.4; stroke-linecap: round;
+  opacity: 0; transition: opacity .12s ease;
+}
+.bt-canto.mudo { color: rgba(201, 213, 232, .45); border-color: rgba(150, 168, 196, .22); }
+.bt-canto.mudo svg .corte { opacity: 1; }
+.bt-canto.mudo svg .onda { opacity: 0; }
+
+/* em tela cheia o botão fica aceso: é o mesmo desenho, agora ligado */
+#telaCheia.cheia { color: var(--laranja-lt); border-color: rgba(247, 118, 34, .55); }
+
+/* no toque os botões crescem: dedo não acerta alvo de 40px com folga */
+@media (pointer: coarse) {
+  #canto { top: 10px; left: 10px; gap: 9px; }
+  .bt-canto { width: 46px; height: 46px; }
+  .bt-canto svg { width: 25px; height: 25px; }
+}
 
 /* ============================= MENUS ============================= */
 #menu, #pause, #matchend {
@@ -221,87 +370,354 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(228,59,68,.42); }
 }
 
 /* ---- a marca do jogo: a guilhotina caindo entre as duas palavras ---- */
-.marca-jogo { position: relative; display: inline-block; text-align: left; }
-.marca-jogo span { display: block; font-weight: 700; line-height: .86; letter-spacing: .06em; }
-.linha-1 { font-size: clamp(40px, 6.6vw, 68px); color: var(--marfim); }
+/* As duas palavras são centradas uma sob a outra: alinhadas à esquerda, DOOR
+   é mais curta e ficava encostada num canto, como se tivesse escorregado. */
+.marca-jogo { position: relative; display: inline-block; text-align: center; }
+.marca-jogo span {
+  display: block; font-weight: 700; line-height: .86; letter-spacing: .06em;
+  text-indent: .06em;                 /* compensa o vão que o espaçamento deixa à direita */
+}
+.linha-1 { font-size: var(--tam-marca); color: var(--marfim); }
 .linha-2 {
-  font-size: clamp(40px, 6.6vw, 68px); padding-left: .06em;
+  font-size: var(--tam-marca);
   color: transparent;
-  background: linear-gradient(180deg, var(--hunter), #7a1f24);
+  background: linear-gradient(180deg, var(--hunter), #8f2229);
   -webkit-background-clip: text; background-clip: text;
 }
 /* a barra desce entre as palavras, como a folha que fecha a passagem */
 .guilhotina {
-  height: 7px; margin: 7px 0; width: 100%;
+  height: 8px; margin: 7px 0 6px; width: 100%; border-radius: 4px;
   background: linear-gradient(90deg, var(--laranja), var(--laranja-lt));
+  box-shadow: 0 0 22px rgba(247, 118, 34, .5);
   transform-origin: top; animation: descer .7s cubic-bezier(.5,0,.3,1) .25s both;
 }
 .guilhotina::after {
-  content: ""; display: block; height: 3px; margin-top: 4px;
+  content: ""; display: block; height: 3px; margin-top: 5px; border-radius: 2px;
   background: repeating-linear-gradient(90deg,
     var(--laranja-dp) 0 9px, transparent 9px 18px);
 }
 @keyframes descer { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
 
+/*
+ * O cartão dos menus.
+ *
+ * Rola quando não cabe: com a tipografia mais grossa e a explicação do formato
+ * da disputa, em tela de 720px o topo do cartaz ficava cortado — e um menu que
+ * esconde o próprio botão de jogar não é um menu.
+ */
 .m-card {
-  position: relative; z-index: 1; text-align: center; padding: 34px 52px; max-width: 560px;
-  background: rgba(8, 8, 14, .72);
-  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
-  clip-path: var(--chanfro);
-  border: 1px solid rgba(139, 155, 180, .14);
+  position: relative; z-index: 1; text-align: center;
+  padding: clamp(15px, 2.9vh, 32px) clamp(22px, 3.4vw, 50px);
+  width: min(94vw, 700px);
+  max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--borda) transparent;
+  background: rgba(9, 10, 18, .78);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  border-radius: 26px;
+  border: 2px solid rgba(150, 168, 196, .26);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .6);
 }
+.m-card::-webkit-scrollbar { width: 7px; }
+.m-card::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 999px; }
+
+.me-nota {
+  margin-top: 6px; font-size: 12px; font-weight: 700; letter-spacing: .14em;
+  color: rgba(214, 226, 242, .55);
+}
+
+/*
+ * As três bandeiras, no rodapé do menu.
+ *
+ * À vista, não numa lista suspensa: quem precisa trocar de idioma é justamente
+ * quem não entende o que está escrito na tela, e obrigar essa pessoa a abrir um
+ * menu escrito no idioma errado é a pior ordem possível. Três bandeiras se
+ * resolvem num olhar.
+ *
+ * Só bandeiras, e todas do mesmo tamanho. A versão anterior escrevia o nome do
+ * idioma escolhido ao lado da bandeira acesa, e isso fazia a fileira inteira
+ * mudar de largura a cada troca — "Português" e "English" não ocupam o mesmo
+ * espaço, e o menu dava um pulo lateral no exato momento em que a pessoa está
+ * comparando as opções. O nome vive no `title`, que aparece sem mexer em nada.
+ *
+ * Quem está escolhida se distingue por anel e cor viva, não por tamanho: as
+ * outras ficam dessaturadas e escuras. Nenhuma medida muda, então a fileira
+ * fica parada.
+ */
+.idiomas { margin-top: clamp(10px, 1.8vh, 18px); }
+.id-tit { display: none; }
+.id-fila { display: flex; gap: 10px; justify-content: center; align-items: center; }
+.id-bt {
+  display: block; margin: 0; padding: 0; width: auto;
+  background: none; border: 0; border-radius: 5px;
+  box-shadow: 0 0 0 2px rgba(150, 168, 196, .28);
+  cursor: pointer; line-height: 0; text-indent: 0;
+  transition: box-shadow .15s ease, transform .12s ease;
+}
+.id-bt span { display: none; }         /* o nome fica no title, sem ocupar espaço */
+.id-bt img {
+  width: 34px; height: 23px; display: block; border-radius: 4px; object-fit: cover;
+  /* apagadas, e só a escolhida acende — a diferença é de cor, nunca de medida */
+  filter: saturate(.15) brightness(.62); transition: filter .15s ease;
+}
+.id-bt:hover {
+  box-shadow: 0 0 0 2px rgba(247, 118, 34, .55);
+  transform: translateY(-1px); filter: none;
+}
+.id-bt:hover img { filter: saturate(.9) brightness(.95); }
+.id-bt.ativo {
+  box-shadow: 0 0 0 3px var(--laranja), 0 0 16px rgba(247, 118, 34, .45);
+  transform: none;
+}
+.id-bt.ativo img { filter: none; }
 
 /* assinatura do estúdio: rodapé discreto, não o cartaz do jogo */
 .selo {
-  margin-top: 26px; font-size: 9px; letter-spacing: .5em;
-  color: rgba(192,203,220,.22); text-indent: .5em;
+  margin-top: clamp(10px, 1.8vh, 20px); font-size: 12px; font-weight: 700; letter-spacing: .26em;
+  color: rgba(214, 226, 242, .42); text-indent: .26em;
 }
-.m-card h2 { font-size: 34px; font-weight: 700; letter-spacing: .16em; margin-bottom: 20px; }
+.m-card h2 { font-size: clamp(32px, 5.6vh, 44px); font-weight: 700; letter-spacing: .06em; margin-bottom: 16px; }
+#matchend.ganhou h2 { color: var(--runner); text-shadow: 0 0 40px rgba(44, 232, 245, .5); }
+#matchend.perdeu h2 { color: var(--hunter); text-shadow: 0 0 40px rgba(255, 90, 99, .5); }
 .tag {
-  margin: 16px 0 28px; color: var(--fumaca); font-size: 14px;
-  letter-spacing: .06em; line-height: 1.75; font-weight: 500;
+  margin: clamp(10px, 2vh, 20px) 0 clamp(8px, 1.6vh, 16px);
+  color: var(--marfim); font-size: clamp(15px, 2.3vh, 18px);
+  letter-spacing: .01em; line-height: 1.5; font-weight: 700;
 }
+
+/*
+ * O formato da disputa, explicado uma vez, aqui.
+ *
+ * Partida e rodada são duas contagens diferentes e o jogador precisa saber a
+ * diferença — mas repetir a explicação num canto do HUD durante o jogo é o que
+ * deixou a tela poluída. No menu ela é lida com calma; lá dentro basta
+ * "RODADA 1 DE 3" e o placar.
+ */
+.regra {
+  margin: 0 auto clamp(10px, 2vh, 22px); max-width: 480px;
+  color: var(--fumaca); font-size: clamp(14px, 2vh, 16px); font-weight: 600; line-height: 1.5;
+  background: rgba(247, 118, 34, .07);
+  border: 2px solid rgba(247, 118, 34, .3); border-radius: var(--raio);
+  padding: clamp(9px, 1.6vh, 15px) 18px; text-align: left;
+}
+.regra b { color: var(--laranja-lt); font-weight: 700; }
 
 button {
-  font-family: var(--fonte); font-size: 15px; letter-spacing: .34em; font-weight: 700;
-  color: var(--preto); background: var(--laranja); border: 0;
-  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
-  padding: 15px 46px; cursor: pointer; display: block; margin: 0 auto 12px;
-  text-indent: .34em; transition: background .15s ease, transform .1s ease;
+  font-family: var(--fonte); font-size: 20px; letter-spacing: .14em; font-weight: 700;
+  color: #1a0d02; background: linear-gradient(180deg, var(--laranja-lt), var(--laranja));
+  border: 0; border-radius: 999px;
+  padding: clamp(12px, 2.2vh, 18px) 54px; cursor: pointer; display: block; margin: 0 auto 12px;
+  text-indent: .14em; box-shadow: 0 8px 24px rgba(247, 118, 34, .35);
+  transition: filter .15s ease, transform .1s ease, box-shadow .15s ease;
 }
-button:hover:not(:disabled) { background: var(--laranja-lt); transform: translateY(-1px); }
-button:active:not(:disabled) { transform: translateY(1px); }
-button:disabled { background: rgba(247,102,22,.22); color: var(--fumaca); cursor: wait; }
+button:hover:not(:disabled) {
+  filter: brightness(1.1); transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(247, 118, 34, .45);
+}
+button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 4px 14px rgba(247, 118, 34, .3); }
+button:disabled {
+  background: rgba(247,102,22,.2); color: var(--fumaca); cursor: wait; box-shadow: none;
+}
 button.ghost {
-  background: transparent; color: var(--fumaca);
-  border: 1px solid var(--borda); font-size: 11px; padding: 10px 26px;
+  background: none; color: var(--fumaca);
+  border: 2px solid var(--borda); font-size: 15px; padding: 12px 30px; box-shadow: none;
 }
-button.ghost:hover { color: var(--laranja-lt); background: rgba(247,102,22,.08); transform: none; }
+button.ghost:hover {
+  color: var(--laranja-lt); background: rgba(247,118,34,.1);
+  border-color: rgba(247,118,34,.5); transform: none; box-shadow: none;
+}
 
-/* controles: uma coluna alinhada, tecla à esquerda e explicação à direita */
+/*
+ * Os controles, em duas colunas.
+ *
+ * Em coluna única as oito linhas ocupavam um terço do menu e empurravam o
+ * rodapé para fora da tela — o jogador tinha que rolar para achar o que já
+ * devia estar à vista. Duas colunas cabem na mesma altura de quatro linhas, e
+ * a lista de teclas é justamente o tipo de coisa que se lê varrendo, não
+ * lendo em ordem.
+ */
 .keys {
-  margin-top: 26px; display: grid; gap: 7px; font-size: 12px;
-  color: var(--fumaca); font-weight: 500; text-align: left;
+  margin-top: clamp(10px, 1.8vh, 18px); display: grid; gap: clamp(4px, .8vh, 8px);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 26px;
+  font-size: 16px; color: var(--marfim); font-weight: 600; text-align: left;
 }
-.keys div { display: flex; align-items: center; gap: 10px; }
-.keys em { font-style: normal; letter-spacing: .04em; }
+.keys div { display: flex; align-items: center; gap: 11px; }
+.keys em { font-style: normal; letter-spacing: .02em; }
 kbd {
-  display: inline-block; min-width: 26px; padding: 3px 8px;
-  background: rgba(247,102,22,.1); border: 1px solid var(--borda);
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-  font-family: var(--fonte); font-size: 10px; font-weight: 700;
-  letter-spacing: .12em; color: var(--laranja-lt); text-align: center;
+  display: inline-block; min-width: 34px; padding: 5px 11px;
+  background: rgba(247,118,34,.2); border: 2px solid rgba(247, 118, 34, .45);
+  border-radius: var(--raio-sm);
+  font-family: var(--fonte); font-size: 14px; font-weight: 700;
+  letter-spacing: .06em; color: var(--laranja-lt); text-align: center;
 }
-.hint { margin-top: 22px; font-size: 10px; letter-spacing: .3em; color: rgba(245,243,238,.22); }
+.hint { margin-top: clamp(10px, 1.8vh, 18px); font-size: 13px; font-weight: 600; letter-spacing: .07em; color: rgba(214,226,242,.55); }
+
+/*
+ * O menu fala a língua do aparelho.
+ * Num celular, "SHIFT para correr" e "clique para travar o mouse" não são só
+ * inúteis: confundem, porque descrevem um jogo que não é o que está na mão.
+ */
+.keys-toque, .hint-toque { display: none; }
+.keys-toque {
+  margin-top: clamp(10px, 1.8vh, 18px); gap: clamp(4px, .8vh, 8px);
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); column-gap: 26px;
+  font-size: 16px; color: var(--marfim); font-weight: 600; text-align: left;
+}
+.keys-toque div { display: flex; align-items: center; gap: 11px; }
+.keys-toque b {
+  min-width: 92px; padding: 5px 11px; font-size: 14px; font-weight: 700;
+  letter-spacing: .06em; color: var(--laranja-lt); text-align: center;
+  background: rgba(247, 118, 34, .2); border: 2px solid rgba(247, 118, 34, .45);
+  border-radius: var(--raio-sm);
+}
+.keys-toque em { font-style: normal; letter-spacing: .02em; }
+.hint-toque { margin-top: clamp(10px, 1.8vh, 18px); font-size: 13px; font-weight: 600; letter-spacing: .07em; color: rgba(214,226,242,.55); }
+
+body.no-toque .keys, body.no-toque .hint { display: none; }
+body.no-toque .keys-toque { display: grid; }
+body.no-toque .hint-toque { display: block; }
+/* ====================== FIM DE PARTIDA ====================== */
+/*
+ * O desfecho tem que pesar.
+ *
+ * Antes o cartão aparecia com um título e um número e pronto: ganhar e perder
+ * tinham a mesma cara, e uma partida de três rodadas terminava valendo menos
+ * que um aviso de porta. Agora a tela inteira toma a cor do resultado, o título
+ * aterrissa, o placar conta de zero, e as rodadas entram uma a uma como extrato.
+ */
+#matchend {
+  background: rgba(5, 4, 3, .92);
+  transition: background .5s ease;
+}
+#matchend.ganhou {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(44, 232, 245, .2) 0%, transparent 62%),
+    rgba(3, 10, 14, .93);
+}
+#matchend.perdeu {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 90, 99, .17) 0%, transparent 62%),
+    rgba(12, 3, 4, .94);
+}
+#meArte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+#meFesta { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+#matchend .m-card { z-index: 3; }
+
+/* a mesma guilhotina do cartaz, agora fechando sobre o resultado — é o que
+   liga esta tela ao resto do jogo em vez de deixá-la com cara de caixa de
+   diálogo genérica */
+#meLamina {
+  width: 128px; height: 7px; margin: 0 auto 14px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--laranja), var(--laranja-lt));
+  box-shadow: 0 0 20px rgba(247, 118, 34, .45);
+  transform-origin: top;
+}
+#meLamina::after {
+  content: ""; display: block; height: 3px; margin-top: 4px; border-radius: 2px;
+  background: repeating-linear-gradient(90deg, var(--laranja-dp) 0 8px, transparent 8px 16px);
+}
+#matchend.entrando #meLamina { animation: descer .55s cubic-bezier(.5, 0, .3, 1) .18s both; }
+
+/* o cartão entra dando um passo à frente, não aparecendo do nada */
+#matchend.entrando .m-card { animation: fimCartao .5s cubic-bezier(.2, 1.2, .35, 1) both; }
+@keyframes fimCartao {
+  from { transform: translateY(26px) scale(.94); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+#meFaixa {
+  font-size: 14px; font-weight: 700; letter-spacing: .22em; text-indent: .22em;
+  color: var(--fumaca); margin-bottom: 10px;
+}
+#matchend.ganhou #meFaixa { color: var(--runner); }
+#matchend.perdeu #meFaixa { color: var(--hunter); }
+
+/* o título aterrissa: vem grande, encolhe e para com um tranco */
+#matchend.entrando h2 { animation: fimTitulo .62s cubic-bezier(.16, 1.5, .3, 1) both; }
+@keyframes fimTitulo {
+  0%   { transform: scale(2.4); opacity: 0; letter-spacing: .5em; }
+  55%  { opacity: 1; }
+  100% { transform: scale(1); opacity: 1; letter-spacing: .06em; }
+}
+
 #meScore {
-  font-size: 46px; font-weight: 700; letter-spacing: .14em; margin-bottom: 24px;
-  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; justify-content: center; gap: 18px;
+  margin-bottom: 4px;
+}
+.me-lado { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.me-lado b {
+  font-size: 13px; font-weight: 700; letter-spacing: .16em;
+  color: var(--fumaca); text-indent: .16em;
+}
+.me-lado i {
+  font-style: normal; font-size: clamp(46px, 8vh, 64px); font-weight: 700;
+  line-height: 1; font-variant-numeric: tabular-nums; color: var(--marfim);
+}
+.me-tr { font-size: 26px; color: rgba(150, 168, 196, .45); }
+#matchend.ganhou .me-lado:first-child i { color: var(--runner); text-shadow: 0 0 30px rgba(44,232,245,.5); }
+#matchend.perdeu .me-lado:last-child i { color: var(--hunter); text-shadow: 0 0 30px rgba(255,90,99,.5); }
+/* cada número que sobe dá um pulinho — é o que faz a contagem ser percebida */
+.me-lado i.bateu { animation: fimPulo .22s ease-out; }
+@keyframes fimPulo { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+/* o extrato: uma pastilha por rodada, entrando na ordem em que aconteceram */
+#meRodadas {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  margin: 18px 0 22px; min-height: 46px;
+}
+.me-rodada {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 6px 13px; border-radius: var(--raio-sm);
+  border: 2px solid rgba(150, 168, 196, .3); background: rgba(255, 255, 255, .04);
+  opacity: 0; transform: translateY(8px) scale(.9);
+  transition: opacity .22s ease, transform .28s cubic-bezier(.2, 1.5, .4, 1);
+}
+.me-rodada.entrou { opacity: 1; transform: none; }
+.me-rodada b { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: rgba(214,226,242,.55); }
+.me-rodada i { font-style: normal; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.me-rodada.sua { border-color: rgba(44, 232, 245, .5); background: rgba(44, 232, 245, .1); }
+.me-rodada.sua i { color: var(--runner); }
+.me-rodada.dele { border-color: rgba(255, 90, 99, .5); background: rgba(255, 90, 99, .1); }
+.me-rodada.dele i { color: var(--hunter); }
+.me-rodada.igual i { color: var(--fumaca); }
+
+/* o botão só entra depois de a cena assentar: sem isso o jogador clica por
+   reflexo e nunca chega a ver o resultado que acabou de conquistar */
+#btnAgain { transition: opacity .3s ease, transform .3s ease, filter .15s ease; }
+#btnAgain.esperando { opacity: 0; transform: translateY(10px); pointer-events: none; }
+
+/*
+ * Telas baixas: o menu abre mão do que é enfeite, nunca do que é instrução.
+ *
+ * A ordem de sacrifício é essa — primeiro a frase de efeito e a assinatura do
+ * estúdio, que ninguém precisa ler para jogar; só depois, e só em tela muito
+ * baixa, o resto. As regras e os controles ficam até o fim, porque são a razão
+ * de o menu existir. Abaixo disso o cartão volta a rolar, que é melhor do que
+ * esconder como se joga.
+ */
+@media (max-height: 640px) {
+  .tag, .selo { display: none; }
+  .id-bt img { width: 28px; height: 19px; }
+  .marca-jogo span { line-height: .82; }
+  .guilhotina { margin: 5px 0 4px; }
+}
+@media (max-height: 440px) {
+  .hint, .hint-toque { display: none; }
+  .idiomas { margin-top: 8px; }
+  .id-bt img { width: 25px; height: 17px; }
+  .marca-jogo span { line-height: .78; }
+  .guilhotina { height: 6px; margin: 3px 0 2px; }
+  body.no-toque .hint-toque { display: none; }
+  .regra { font-size: 13px; padding: 7px 13px; margin-bottom: 9px; line-height: 1.4; }
+  .keys, .keys-toque { font-size: 13px; gap: 3px; margin-top: 8px; }
+  kbd, .keys-toque b { padding: 3px 8px; font-size: 12px; min-width: 28px; }
+  .keys-toque b { min-width: 78px; }
+  button { padding: 9px 36px; font-size: 16px; margin-bottom: 8px; }
 }
 
 #loading {
   position: fixed; inset: 0; z-index: 30; display: flex; align-items: center;
-  justify-content: center; background: var(--preto); font-size: 12px;
-  letter-spacing: .5em; color: var(--fumaca);
+  justify-content: center; background: var(--preto); font-size: 16px;
+  font-weight: 700; letter-spacing: .18em; color: var(--fumaca);
 }
 .dots::after { content: ""; animation: pontos 1.2s steps(4, end) infinite; }
 @keyframes pontos { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }

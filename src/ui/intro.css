@@ -95,13 +95,27 @@
   background: none; -webkit-text-fill-color: rgba(245,243,238,.5);
 }
 
-/* brilho metálico atravessando a marca */
+/*
+ * Brilho metálico atravessando a marca.
+ *
+ * Some o `overlay` daqui: aquele modo escurece o que já é escuro, e a marca é
+ * laranja sobre preto — o branco do brilho entrava e simplesmente sumia. Com
+ * `screen` a faixa sempre clareia, que é o comportamento de um reflexo.
+ *
+ * A faixa também é mais estreita e mais forte que antes: reflexo em metal é um
+ * risco de luz que passa, não um véu difuso atravessando a peça inteira.
+ */
 #intro .sweep {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.85) 48%, transparent 66%);
+  background: linear-gradient(115deg,
+    transparent 38%,
+    rgba(255, 240, 214, .35) 45%,
+    rgba(255, 255, 255, .98) 50%,
+    rgba(255, 240, 214, .35) 55%,
+    transparent 62%);
   background-size: 300% 300%;
   background-position: 130% 0%;
-  mix-blend-mode: overlay;
+  mix-blend-mode: screen;
   opacity: 0;
 }
 #intro .sweep.mascara {
@@ -110,11 +124,12 @@
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-position: center; mask-position: center;
 }
-#intro .sweep.brilhar { animation: introSweep 1.5s ease-in-out forwards; }
+#intro .sweep.brilhar { animation: introSweep 1.25s cubic-bezier(.4,0,.5,1) forwards; }
 @keyframes introSweep {
   0%   { background-position: 130% 0%; opacity: 0; }
-  22%  { opacity: .95; }
-  100% { background-position: -30% 0%; opacity: 0; }
+  12%  { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { background-position: -35% 0%; opacity: 0; }
 }
 
 /* ------------------------- começar / pular ------------------------- */
@@ -127,7 +142,18 @@
   font-size: clamp(16px, 2.2vw, 22px); letter-spacing: .42em; font-weight: 600;
   color: #ffa24d; animation: introPisca 2s ease-in-out infinite;
 }
-#intro .comecar span { font-size: 12px; letter-spacing: .3em; color: rgba(245,243,238,.35); }
+#intro .comecar .sub { font-size: 12px; letter-spacing: .3em; color: rgba(245,243,238,.35); }
+#intro .comecar.indo { opacity: .35; transition: opacity .12s ease; }
+
+/* o que está carregando por baixo do convite */
+#intro .comecar .carregando {
+  width: 190px; height: 3px; margin-top: 6px;
+  background: rgba(247, 102, 22, .16); overflow: hidden;
+}
+#intro .comecar .carregando i {
+  display: block; height: 100%; background: #f76616;
+  transform: scaleX(0); transform-origin: left; transition: transform .2s linear;
+}
 @keyframes introPisca { 50% { opacity: .35; } }
 
 #intro .pular {

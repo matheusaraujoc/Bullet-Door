@@ -1,0 +1,89 @@
+/*
+ * Controles na tela e botão de tela cheia.
+ *
+ * As peças vêm do conjunto em images/Mobile_Controls, que já é escuro e
+ * chapado como o resto do jogo; aqui elas só ganham rótulo e o laranja de
+ * ação por cima. Tudo com `touch-action: none` — sem isso o navegador
+ * interpreta o arrasto como rolagem e o jogo trava no meio do movimento.
+ */
+#toque {
+  position: fixed; inset: 0; z-index: 15;
+  display: none; pointer-events: none;
+  touch-action: none; -webkit-user-select: none; user-select: none;
+}
+#toque.ativo { display: block; }
+
+/* metade direita da tela: arrastar para olhar em volta */
+#toque .olhar {
+  position: absolute; right: 0; top: 0; width: 55%; height: 100%;
+  pointer-events: auto; touch-action: none;
+}
+
+/* ------------------------------- joystick ------------------------------- */
+#toque .joy {
+  position: absolute; left: 22px; bottom: 22px;
+  width: 132px; height: 132px;
+  pointer-events: auto; touch-action: none;
+}
+#toque .pad, #toque .nub {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated; pointer-events: none;
+}
+#toque .pad { width: 132px; height: 132px; opacity: .82; }
+#toque .nub { width: 62px; height: 62px; opacity: .95; transition: transform .06s linear; }
+
+/* -------------------------------- botões -------------------------------- */
+#toque .botoes {
+  position: absolute; right: 18px; bottom: 16px;
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(3, auto);
+  grid-template-areas:
+    ".       correr  agachar"
+    "porta   mira    atirar";
+  align-items: end; justify-items: center;
+  pointer-events: none;
+}
+#toque .bt-correr  { grid-area: correr; }
+#toque .bt-agachar { grid-area: agachar; }
+#toque .bt-porta   { grid-area: porta; }
+#toque .bt-mirar   { grid-area: mira; }
+#toque .bt-atirar  { grid-area: atirar; }
+
+#toque .bt {
+  pointer-events: auto; touch-action: none;
+  width: 68px; height: 68px; padding: 0; border: 0; background: transparent;
+  background-image: var(--img); background-size: 100% 100%;
+  image-rendering: pixelated; cursor: pointer;
+  display: grid; place-items: center;
+  font-family: inherit; color: #c0cbdc;
+  transition: transform .06s ease, filter .12s ease;
+}
+#toque .bt span {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-shadow: 0 1px 2px rgba(0,0,0,.9); pointer-events: none;
+}
+#toque .bt.apertado { transform: scale(.92); filter: brightness(1.6); }
+#toque .bt.ligado { filter: brightness(1.5) saturate(1.4); color: #feae34; }
+
+/* atirar é o botão que a mão procura sem olhar: maior e marcado */
+#toque .bt-atirar { width: 92px; height: 92px; color: #ffb4a2; }
+#toque .bt-atirar span { font-size: 11px; }
+#toque .bt-atirar.apertado { filter: brightness(1.9) saturate(1.5); }
+
+/* --------------------------- espiar pelos cantos ------------------------ */
+#toque .espiar {
+  position: absolute; left: 26px; bottom: 172px;
+  display: flex; gap: 10px; pointer-events: none;
+}
+#toque .espiar .bt { width: 52px; height: 52px; }
+#toque .espiar .bt span { font-size: 15px; }
+
+@media (max-width: 560px) {
+  #toque .joy { width: 112px; height: 112px; left: 14px; bottom: 14px; }
+  #toque .pad { width: 112px; height: 112px; }
+  #toque .nub { width: 52px; height: 52px; }
+  #toque .bt { width: 58px; height: 58px; }
+  #toque .bt-atirar { width: 78px; height: 78px; }
+  #toque .espiar { bottom: 142px; left: 16px; }
+}

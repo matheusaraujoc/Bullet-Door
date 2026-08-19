@@ -3,6 +3,7 @@ import { CFG } from './core/config.js';
 import { Game } from './core/Game.js';
 import { tocarIntro } from './ui/Intro.js';
 import { MenuArte } from './ui/MenuArte.js';
+import { t, aplicarNoDocumento } from './ui/i18n.js';
 
 // Atalhos de teste pela URL:
 //   ?fast      encurta as fases e pula a abertura
@@ -25,14 +26,23 @@ loading.classList.add('hidden');
 
 // os modelos carregam enquanto a abertura roda: quando ela termina, na maioria
 // das vezes já está tudo pronto e o botão nasce habilitado
-btn.disabled = true;
-btn.textContent = 'CARREGANDO';
-const carregando = game.load().then(
-  () => { btn.disabled = false; btn.textContent = 'JOGAR'; },
-  e => { btn.textContent = 'ERRO AO CARREGAR'; console.error('falha ao carregar os modelos:', e); });
+// o documento inteiro no idioma escolhido antes de qualquer coisa aparecer
+aplicarNoDocumento();
 
-if (!q.has('fast') && !q.has('semintro')) await tocarIntro();
+btn.disabled = true;
+btn.textContent = t('menu.carregando');
+
+// a abertura mostra este progresso enquanto espera o primeiro toque, para o
+// jogador saber que a espera tem fim
+const carga = { progresso: 0, pronto: false };
+const carregando = game.load(p => { carga.progresso = p; }).then(
+  () => { carga.pronto = true; carga.progresso = 1; btn.disabled = false; btn.textContent = t('menu.jogar'); },
+  e => { carga.pronto = true; btn.textContent = t('menu.erro'); console.error('falha ao carregar os modelos:', e); });
+
+if (!q.has('fast') && !q.has('semintro')) await tocarIntro({ carga });
 menu.classList.remove('hidden');
+// a abertura já custou um toque do jogador, então o navegador deixa tocar
+game.audio.tocarMusica('audios/menu.mp3');
 
 // a planta de fundo do menu: um mapa real, gerado na hora
 const arte = new MenuArte(document.getElementById('menuArte'));

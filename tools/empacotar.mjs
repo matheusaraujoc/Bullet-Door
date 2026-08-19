@@ -1,8 +1,8 @@
 // Gera o zip para subir no itch.io (ou em qualquer host estático).
 //   npm run itch
-import { execFileSync } from 'node:child_process';
-import { existsSync, rmSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { zipar } from './zip.mjs';
 
 const SAIDA = 'bullet-door-web.zip';
 
@@ -12,33 +12,22 @@ if (!existsSync('dist') || !existsSync(join('dist', 'index.html'))) {
 }
 
 // O itch.io exige index.html na RAIZ do zip: ele descompacta e abre esse
-// arquivo direto. Zipar a pasta dist inteira colocaria tudo um nível abaixo e
-// o portal não acharia nada.
+// arquivo direto. Zipar a pasta dist inteira deixaria tudo um nível abaixo.
 if (existsSync(SAIDA)) rmSync(SAIDA);
+const { arquivos, bytes } = zipar('dist', SAIDA);
 
-if (process.platform === 'win32') {
-  execFileSync('powershell', ['-NoProfile', '-Command',
-    `Compress-Archive -Path 'dist\\*' -DestinationPath '${SAIDA}' -Force`], { stdio: 'inherit' });
-} else {
-  execFileSync('zip', ['-r', '-q', join('..', SAIDA), '.'], { cwd: 'dist', stdio: 'inherit' });
+console.log(`\n${SAIDA} — ${(bytes / 1024 / 1024).toFixed(2)} MB\n`);
+console.log('  conteúdo:');
+for (const a of arquivos) {
+  const kb = statSync(join('dist', a)).size / 1024;
+  console.log(`   ${a.padEnd(42)} ${kb.toFixed(0).padStart(6)} KB`);
 }
 
-const mb = statSync(SAIDA).size / 1024 / 1024;
-
-/** Lista o que foi parar no pacote, para conferência rápida. */
-const andar = (dir, prefixo = '') => {
-  for (const nome of readdirSync(dir, { withFileTypes: true })) {
-    if (nome.isDirectory()) andar(join(dir, nome.name), `${prefixo}${nome.name}/`);
-    else {
-      const kb = statSync(join(dir, nome.name)).size / 1024;
-      console.log(`   ${(prefixo + nome.name).padEnd(42)} ${kb.toFixed(0).padStart(6)} KB`);
-    }
-  }
-};
-
-console.log(`\n${SAIDA} — ${mb.toFixed(2)} MB\n`);
-console.log('  conteúdo:');
-andar('dist');
+const barrasErradas = arquivos.filter(a => a.includes('\\'));
+if (barrasErradas.length) {
+  console.error('\nERRO: caminho com barra invertida no pacote:', barrasErradas);
+  process.exit(1);
+}
 
 console.log(`
   Para publicar no itch.io:

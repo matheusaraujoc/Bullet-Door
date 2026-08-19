@@ -5,6 +5,11 @@ import { AudioSys } from './AudioSys.js';
 import { Input } from './Input.js';
 import { RoundManager } from './RoundManager.js';
 import { HUD } from '../ui/HUD.js';
+import { TouchControls, ehToque } from '../ui/TouchControls.js';
+import { criarBotoesDeCanto } from '../ui/Canto.js';
+import { FimDePartida } from '../ui/FimDePartida.js';
+import { t, aplicarNoDocumento, aoTrocarIdioma } from '../ui/i18n.js';
+import { criarSeletorDeIdioma } from '../ui/SeletorIdioma.js';
 import { World } from '../world/World.js';
 import { generateMap, randomFloorCell, mulberry32 } from '../world/MazeGen.js';
 import { gridDistance } from '../ai/Pathfinder.js';
@@ -49,6 +54,38 @@ export class Game {
     this.muzzleLight.position.set(0.25, -0.05, -1.1);
     this.camera.add(this.muzzleLight);
 
+    /*
+     * A arma mora numa cena só dela, desenhada por cima do mundo.
+     *
+     * Enquanto ela era filha da câmera do mundo, ela era um objeto do mundo:
+     * encostou numa parede, a parede ganhou o teste de profundidade e o cano
+     * atravessou o reboco. Não existe conserto para isso dentro de uma cena só
+     * — a arma está literalmente a meio metro do olho, e qualquer parede a
+     * menos disso vence.
+     *
+     * A saída, que é a de sempre em jogo de tiro: renderizar o mundo, limpar o
+     * buffer de profundidade, e desenhar a arma numa segunda passada. Ela passa
+     * a não ter profundidade em comum com nada, então nunca entra em coisa
+     * alguma. O preço é que a arma também não recebe sombra nem oclusão do
+     * cenário, o que aqui não custa nada: a iluminação já é assada.
+     */
+    this.vmScene = new THREE.Scene();
+    this.vmCamera = new THREE.PerspectiveCamera(CFG.FOV, innerWidth / innerHeight, 0.01, 8);
+    this.vmScene.add(this.vmCamera);
+    // as mesmas luzes do mundo, para a arma não destoar do resto
+    this.vmScene.add(new THREE.HemisphereLight(0xdfe6f2, 0x3a3550, 1.5));
+    const vmSol = new THREE.DirectionalLight(0xfff2d8, 1.0);
+    vmSol.position.set(0.5, 1, 0.3);
+    this.vmScene.add(vmSol);
+    const vmFill = new THREE.DirectionalLight(0x9fb6d8, 0.45);
+    vmFill.position.set(-0.6, 0.4, -0.5);
+    this.vmScene.add(vmFill);
+    this.vmMuzzleLight = new THREE.PointLight(EDG.amber, 0, 4, 2.2);
+    this.vmMuzzleLight.position.set(0.1, 0.05, -0.9);
+    this.vmCamera.add(this.vmMuzzleLight);
+    // o renderizador limpa por conta própria uma vez por quadro, aqui
+    this.renderer.autoClear = false;
+
     this.audio = new AudioSys();
     this.input = new Input(canvas);
     this.hud = new HUD();
@@ -69,9 +106,34 @@ export class Game {
     this._buildEffects();
 
     this.input.onInteract = () => this.tryDoor();
+    // o pedido de ponteiro pode ser recusado; melhor voltar para a pausa, com
+    // um botão para tentar de novo, do que rodar com a câmera morta
+    this.input.onLockFail = () => {
+      if (this.running && !this.paused) this.pause();
+    };
     this.input.onLockChange = locked => {
+      // no toque não existe ponteiro travado, então perder o lock não é sinal
+      // de que o jogador saiu do jogo
+      if (!this.input.precisaTravar()) return;
+      if (locked && this.running) this.hud.lembrarMouse();
       if (!locked && this.running && !this.paused && this.rounds.state !== 'matchend') this.pause();
     };
+
+    criarBotoesDeCanto(this.audio);
+    this.fim = new FimDePartida(this.audio);
+
+    /*
+     * Trocar de idioma repinta o documento inteiro e o que é escrito por
+     * código. O HUD não pode ficar em português enquanto o menu já mudou —
+     * e o jogador troca o idioma justamente porque não entende o que está lá.
+     */
+    criarSeletorDeIdioma(undefined, () => this._retraduzir());
+    aoTrocarIdioma(() => this._retraduzir());
+    this.toque = new TouchControls(this.input, this);
+    const querToque = ehToque() || new URLSearchParams(location.search).has('touch');
+    this.toque.mostrar(querToque);
+    // marca o corpo para a interface trocar textos de tecla por textos de toque
+    document.body.classList.toggle('no-toque', querToque);
     addEventListener('resize', () => this.resize());
     injectCssPalette();
     this._bindMenus();
@@ -183,6 +245,9 @@ export class Game {
     if (this.muzzleLight.intensity > 0) {
       this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 34);
     }
+    if (this.vmMuzzleLight.intensity > 0) {
+      this.vmMuzzleLight.intensity = Math.max(0, this.vmMuzzleLight.intensity - dt * 34);
+    }
     if (this.worldFlashLight.intensity > 0) {
       this.worldFlashLight.intensity = Math.max(0, this.worldFlashLight.intensity - dt * 40);
     }
@@ -191,7 +256,7 @@ export class Game {
   // ---------------------------------------------------------------- setup
   async load(onProgress) {
     await this.assets.load(onProgress);
-    this.player.attachViewModel(this.assets);
+    this.player.attachViewModel(this.assets, this.vmCamera);
     this.ready = true;
   }
 
@@ -200,9 +265,17 @@ export class Game {
     const pause = document.getElementById('pause');
     const matchend = document.getElementById('matchend');
 
+    /*
+     * A música acompanha o menu, não a partida.
+     *
+     * Dentro da rodada o som é informação: passo, porta, tiro à distância. Uma
+     * trilha por cima disso não é ambientação, é ruído em cima da única pista
+     * que o jogador tem de onde o outro está.
+     */
     document.getElementById('btnPlay').onclick = () => {
       if (!this.ready) return;
       this.audio.init(); this.audio.resume(); this.audio.play('click');
+      this.audio.pararMusica();
       menu.classList.add('hidden');
       this.startMatch();
     };
@@ -213,25 +286,81 @@ export class Game {
       this.running = false;
       this.hud.show(false);
       menu.classList.remove('hidden');
+      this.audio.tocarMusica('audios/menu.mp3');
+    };
+    document.getElementById('btnMenu').onclick = () => {
+      this.audio.play('click');
+      this.fim.esconder();
+      this.hud.show(false);
+      this.running = false;
+      menu.classList.remove('hidden');
     };
     document.getElementById('btnAgain').onclick = () => {
       this.audio.play('click');
-      matchend.classList.add('hidden');
+      this.fim.esconder();
+      this.audio.pararMusica();
       this.startMatch();
     };
+    /*
+     * ESC é sempre saída, nunca entrada.
+     *
+     * Já foi um alternador — pausa se estiver jogando, retoma se estiver
+     * pausado — e era isso que prendia o mouse. A sequência: o navegador vê o
+     * ESC e solta o ponteiro por conta própria; `pointerlockchange` dispara e
+     * pausa o jogo; e então o keydown do MESMO ESC chega, encontra o jogo já
+     * pausado, e retoma — travando o ponteiro de novo no mesmo instante. Quem
+     * apertava ESC via o mouse ser tomado de volta e só se livrava com alt+tab.
+     *
+     * Retomar agora exige um gesto que não é ambíguo: o botão Continuar, ou um
+     * clique na cena. Nenhum dos dois pode acontecer sem querer.
+     */
     addEventListener('keydown', e => {
-      if (e.code !== 'Escape' || !this.running) return;
-      if (this.paused) this.resume(); else this.pause();
+      if (e.code !== 'Escape') return;
+      this.input.unlock();
+      if (this.running && !this.paused) this.pause();
     });
     this.canvas.addEventListener('click', () => {
+      if (!this.input.precisaTravar()) return;
       if (this.running && !this.paused && !this.input.locked) this.input.lock();
     });
+  }
+
+  /** Reaplica os textos depois de uma troca de idioma. */
+  _retraduzir() {
+    aplicarNoDocumento();
+    this.audio.aoMudar?.();                       // os botões do canto têm title
+    if (this.running) {
+      this.hud.setRole(this.player.role, this._objetivo(this.player.role));
+      this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round);
+    }
   }
 
   resize() {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
+    this.vmCamera.aspect = this.camera.aspect;
+    this.vmCamera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
+  }
+
+  /**
+   * Mundo primeiro, arma por cima.
+   *
+   * O `clearDepth` entre as duas passadas é a peça toda: sem ele a segunda
+   * cena ainda disputaria profundidade com a primeira e nada mudaria.
+   */
+  _desenhar() {
+    this.renderer.clear();
+    this.renderer.render(this.scene, this.camera);
+    // a arma acompanha a abertura da câmera do mundo, inclusive na mira de
+    // ferro — é o que mantém o alinhamento da alça com o centro da tela
+    if (this.vmCamera.fov !== this.camera.fov) {
+      this.vmCamera.fov = this.camera.fov;
+      this.vmCamera.updateProjectionMatrix();
+    }
+    this.vmCamera.rotation.z = this.player.rollAtual || 0;
+    this.renderer.clearDepth();
+    this.renderer.render(this.vmScene, this.vmCamera);
   }
 
   startMatch() {
@@ -239,7 +368,7 @@ export class Game {
     this.running = true;
     this.paused = false;
     this.rounds.startMatch();
-    this.input.lock();
+    if (this.input.precisaTravar()) this.input.lock();
     this.clock.getDelta();
     if (!this._loop) { this._loop = true; this.renderer.setAnimationLoop(() => this.frame()); }
   }
@@ -253,7 +382,7 @@ export class Game {
   resume() {
     this.paused = false;
     document.getElementById('pause').classList.add('hidden');
-    this.input.lock();
+    if (this.input.precisaTravar()) this.input.lock();
     this.clock.getDelta();
   }
 
@@ -299,6 +428,21 @@ export class Game {
     this.hud.setDanger(false);
   }
 
+  /**
+   * Inverte os papéis sem mexer em ninguém de lugar.
+   *
+   * É o que acontece quando o tempo acaba sem abate: você estava caçando, o
+   * relógio virou, e agora quem corre é você — do mesmo ponto, com o oponente
+   * exatamente onde ele estava. As portas também ficam como estavam, porque
+   * fazem parte da situação que vocês dois construíram até ali.
+   */
+  trocarPapeis(playerRole) {
+    this.player.setRole(playerRole);
+    this.player.alive = true;
+    this.bot.setRole(playerRole === 'hunter' ? 'runner' : 'hunter');
+    this.hud.setDanger(false);
+  }
+
   // --------------------------------------------------------------- eventos
   onHalfPrepared(role, half, comIntro) {
     this.hud.setRole(role, this._objetivo(role));
@@ -306,10 +450,11 @@ export class Game {
     this.hud.setTimer(CFG.PHASE_TIME);
     this.hud.setPhase(1);
     if (comIntro) {
-      this.hud.big(`RODADA ${this.rounds.round}`, role === 'hunter' ? 'VOCÊ CAÇA' : 'VOCÊ FOGE', role);
+      this.hud.big(t('jogo.rodada', { n: this.rounds.round }),
+        t(role === 'hunter' ? 'jogo.voceCaca' : 'jogo.voceFoge'), role);
     } else {
       this.audio.play('swap');
-      this.hud.big('TROCA', role === 'hunter' ? 'AGORA VOCÊ CAÇA' : 'AGORA VOCÊ FOGE', role);
+      this.hud.big(t('jogo.troca'), t(role === 'hunter' ? 'jogo.agoraCaca' : 'jogo.agoraFoge'), role);
     }
   }
 
@@ -322,19 +467,40 @@ export class Game {
    * Fim de metade. A troca é o ritmo natural da partida, não um veredito:
    * se ninguém foi atingido, a rodada simplesmente segue para a próxima metade.
    */
-  onHalfEnded(role, abateu, tempo) {
+  onHalfEnded(role, abateu) {
     this.player.vel.set(0, 0, 0);
     if (!abateu) return;
-    if (role === 'hunter') this.hud.big('ALVO ELIMINADO', `${tempo.toFixed(1)}s`, 'hunter');
-    else this.hud.big('VOCÊ FOI ABATIDO', `${tempo.toFixed(1)}s`, 'runner');
+    // O número grande é o ponto, não o cronômetro. Mostrar "8.4s" aqui era o
+    // que fazia a velocidade parecer valer alguma coisa — e não vale: o que
+    // conta é a eliminação ter acontecido.
+    if (role === 'hunter') this.hud.big(t('jogo.alvoEliminado'), t('jogo.pontoSeu'), 'hunter');
+    else this.hud.big(t('jogo.foiAbatido'), t('jogo.pontoDele'), 'runner');
   }
 
-  onRoundEnded(vencedor, y, b) {
-    const linha = `VOCÊ ${y === null ? '--' : y.toFixed(1) + 's'}   ·   BOT ${b === null ? '--' : b.toFixed(1) + 's'}`;
-    if (vencedor === 'you') { this.audio.play('win'); this.hud.big(linha, 'RODADA SUA', 'runner'); }
-    else if (vencedor === 'bot') { this.audio.play('lose'); this.hud.big(linha, 'RODADA DO BOT', 'hunter'); }
-    else this.hud.big(linha, 'EMPATE');
-    this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round);
+  /**
+   * Fim de rodada: o que cada lado marcou nela, e como ficou o placar.
+   *
+   * O placar grande é o número de eliminações, que é a única conta que decide
+   * a partida. A linha de cima nomeia o que acabou de acontecer, para o jogador
+   * ligar o próprio tiro ao número que subiu.
+   *
+   * E ela nomeia a rodada INTEIRA, não só a caçada. A rodada fecha logo depois
+   * da metade de fuga, então esta é a primeira coisa que se lê depois de
+   * escapar — e ela dizia "VOCÊ ELIMINOU", falando de um tiro dado um minuto
+   * antes e ignorando o que a pessoa acabou de fazer. Um a zero quer dizer duas
+   * coisas: você eliminou **e** sobreviveu. Zero a zero quer dizer que os dois
+   * sobreviveram, não que nada aconteceu.
+   */
+  onRoundEnded(seuPonto, pontoBot, placarSeu, placarBot) {
+    const sub = t(seuPonto && pontoBot ? 'jogo.osDois'
+      : seuPonto ? 'jogo.vocePontuou'
+      : pontoBot ? 'jogo.elePontuou'
+      : 'jogo.ninguem');
+    const cor = seuPonto && !pontoBot ? 'runner' : pontoBot && !seuPonto ? 'hunter' : '';
+    if (seuPonto && !pontoBot) this.audio.play('win');
+    else if (pontoBot && !seuPonto) this.audio.play('lose');
+    this.hud.big(sub, t('jogo.placar', { seu: placarSeu, dele: placarBot }), cor);
+    this.hud.setScore(placarSeu, placarBot, this.rounds.round);
   }
 
   onMatchEnded(vencedor) {
@@ -342,23 +508,17 @@ export class Game {
     this.hud.show(false);
     this.input.unlock();
     this.running = false;
-    document.getElementById('meTitle').textContent =
-      vencedor === 'you' ? 'VITÓRIA' : vencedor === 'bot' ? 'DERROTA' : 'EMPATE';
-    document.getElementById('meScore').textContent =
-      `${this.rounds.scoreYou} — ${this.rounds.scoreBot}`;
-    document.getElementById('matchend').classList.remove('hidden');
-    this.audio.play(vencedor === 'you' ? 'win' : 'lose');
+    document.body.classList.remove('danger');
+    this.fim.mostrar(vencedor, this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.historico);
+    this.audio.tocarMusica('audios/menu.mp3');
   }
 
+  /**
+   * As duas metades são a mesma conta vista dos dois lados: caçando você marca
+   * um ponto, fugindo você nega o dele. Sem cronômetro-alvo no meio disso.
+   */
   _objetivo(role) {
-    if (role === 'hunter') {
-      const b = this.rounds.botTime;
-      return b === null ? 'ENCONTRE E ELIMINE' : `ELIMINE EM MENOS DE ${Math.ceil(b)}s`;
-    }
-    const t = this.rounds.survivalTarget;
-    if (t === null) return 'SOBREVIVA ATÉ O FIM';
-    const passou = CFG.PHASE_TIME - this.rounds.phaseTime;
-    return passou > t ? 'AGUENTE — A RODADA É SUA' : `SOBREVIVA ${Math.ceil(t)}s PARA VENCER`;
+    return t(role === 'hunter' ? 'hud.objCacar' : 'hud.objFugir');
   }
 
   // ----------------------------------------------------------------- ruído
@@ -397,6 +557,7 @@ export class Game {
   // ----------------------------------------------------------------- tiros
   onPlayerShoot() {
     this.muzzleLight.intensity = 3.2;
+    this.vmMuzzleLight.intensity = 2.6;
     const ray = this.player.aimRay();
     const hits = ray.intersectObjects(this.raycastTargets, false);
     const muzzle = this.player.muzzleWorld();
@@ -421,7 +582,7 @@ export class Game {
   killBot() {
     this.bot.die();
     this.audio.play('hit', { vol: 0.9 });
-    this.hud.feed('ALVO ABATIDO');
+    this.hud.feed(t('hud.alvoAbatido'));
     this.rounds.registerKill();
   }
 
@@ -434,14 +595,16 @@ export class Game {
   }
 
   onBotMissed(bot) {
-    this.hud.feed('PASSOU PERTO');
+    this.hud.feed(t('hud.passouPerto'));
     this.audio.playAt('bump', bot.pos, this.player.pos, this.player.yaw, 22, 0.5);
   }
 
   // ------------------------------------------------------------------ loop
   frame() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
-    if (!this.running) { this.renderer.render(this.scene, this.camera); return; }
+    // sem `autoClear`, toda saída do laço tem que passar por `_desenhar`,
+    // senão o quadro anterior fica na tela
+    if (!this.running) { this._desenhar(); return; }
 
     if (!this.paused) {
       this.rounds.update(dt);
@@ -460,7 +623,7 @@ export class Game {
       this._updateEffects(dt);
       this._updateHud(dt, vivo);
     }
-    this.renderer.render(this.scene, this.camera);
+    this._desenhar();
   }
 
   _updateHud(dt, vivo) {
@@ -485,8 +648,10 @@ export class Game {
     const perto = vivo && this.player.alive ? this.world?.doors.nearest(this.player.pos) : null;
     let aviso = null;
     if (perto) {
-      if (perto.kind === 'desvio') aviso = '[F] VIRAR PASSAGEM';
-      else aviso = perto.open ? '[F] FECHAR PORTA' : '[F] ABRIR PORTA';
+      // no toque não existe tecla F: quem abre a porta é o botão na tela
+      const tecla = this.input.precisaTravar() ? '[F] ' : '';
+      if (perto.kind === 'desvio') aviso = `${tecla}VIRAR PASSAGEM`;
+      else aviso = perto.open ? `${tecla}FECHAR PORTA` : `${tecla}ABRIR PORTA`;
     }
     this.hud.prompt(aviso);
   }

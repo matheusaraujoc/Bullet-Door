@@ -1,4 +1,5 @@
 import './intro.css';
+import { t } from './i18n.js';
 import { asset } from '../core/assets-url.js';
 
 const LOGO = asset('images/Kountera_Games_Logo.png');
@@ -42,7 +43,8 @@ function temLogo() {
  *
  * @returns {Promise<void>} resolve quando a tela estiver livre para o menu
  */
-export async function tocarIntro({ pulavel = true } = {}) {
+export async function tocarIntro({ pulavel = true, carga = null } = {}) {
+  const noToque = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
   const reduzir = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const el = document.createElement('div');
@@ -58,8 +60,9 @@ export async function tocarIntro({ pulavel = true } = {}) {
     </div>
     <div class="pular"></div>
     <div class="comecar">
-      <b>CLIQUE PARA COMEÇAR</b>
-      <span>O JOGO USA SOM</span>
+      <b>${noToque ? t('intro.comecarToque') : t('intro.comecarClique')}</b>
+      <span class="sub">O JOGO USA SOM</span>
+      <div class="carregando"><i></i></div>
     </div>`;
   document.body.appendChild(el);
 
@@ -71,10 +74,44 @@ export async function tocarIntro({ pulavel = true } = {}) {
   const comecar = el.querySelector('.comecar');
   const pular = el.querySelector('.pular');
 
-  // monta a marca: imagem se houver, tipografia se não
-  const [comLogo, somMarca, somMetal] = await Promise.all([
+  // Logo e sons carregam POR BAIXO do convite, não antes dele. Esperar aqui
+  // deixava a tela parada por segundos numa rede de celular, e o jogador via
+  // um preto sem explicação — parecia que o jogo não tinha aberto.
+  const prontos = Promise.all([
     temLogo(), carregarAudio(SOM_MARCA), carregarAudio(SOM_METAL),
   ]);
+
+  const barra = comecar.querySelector('.carregando i');
+  const sub = comecar.querySelector('.sub');
+  const acompanhar = setInterval(() => {
+    if (!carga) return;
+    const pct = Math.round((carga.progresso || 0) * 100);
+    barra.style.transform = `scaleX(${(carga.progresso || 0).toFixed(3)})`;
+    sub.textContent = carga.pronto ? t('intro.usaSom') : t('intro.carregando', { pct });
+  }, 120);
+
+  // ---- espera o primeiro toque, que é o que libera o áudio ----
+  await new Promise(resolve => {
+    const ir = ev => {
+      // Sem isto, o mesmo gesto sobe até #intro e aciona o "pular" logo
+      // abaixo: a continuação do await roda no microtask, ou seja, ANTES do
+      // evento terminar de borbulhar, e a abertura pulava inteira sozinha.
+      ev?.stopPropagation();
+      ev?.preventDefault();
+      comecar.classList.add('indo');       // resposta imediata ao dedo
+      clearInterval(acompanhar);
+      removeEventListener('keydown', ir);
+      setTimeout(() => comecar.remove(), 120);
+      resolve();
+    };
+    // pointerdown responde na hora; click no celular ainda espera o gesto
+    comecar.addEventListener('pointerdown', ir, { once: true });
+    comecar.addEventListener('click', ir, { once: true });
+    addEventListener('keydown', ir, { once: true });
+  });
+
+  // agora sim: usa o que já chegou, e o resto entra em cima da hora
+  const [comLogo, somMarca, somMetal] = await prontos;
   if (comLogo) {
     marca.innerHTML = `<img class="logo" src="${LOGO}" alt="Kountera Games">`;
     sweep.classList.add('mascara');
@@ -83,25 +120,10 @@ export async function tocarIntro({ pulavel = true } = {}) {
     marca.innerHTML = `<div class="logo-texto">KOUNTERA<small>GAMES</small></div>`;
   }
 
-  // ---- espera o primeiro clique, que é o que libera o áudio ----
-  await new Promise(resolve => {
-    const ir = ev => {
-      // Sem isto, o mesmo clique sobe até #intro e aciona o "pular" logo
-      // abaixo: a continuação do await roda no microtask, ou seja, ANTES do
-      // evento terminar de borbulhar, e a abertura pulava inteira sozinha.
-      ev?.stopPropagation();
-      comecar.remove();
-      removeEventListener('keydown', ir);
-      resolve();
-    };
-    comecar.addEventListener('click', ir, { once: true });
-    addEventListener('keydown', ir, { once: true });
-  });
-
   let saiuCedo = false;
   const sair = () => { saiuCedo = true; };
   if (pulavel) {
-    pular.textContent = 'CLIQUE PARA PULAR';
+    pular.textContent = noToque ? t('intro.pularToque') : t('intro.pularClique');
     // cinto e suspensório: só arma o atalho no quadro seguinte
     setTimeout(() => {
       el.addEventListener('click', sair);

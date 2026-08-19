@@ -34,6 +34,7 @@ export class Player {
     this.correndo = false;
     this.lastLook = new THREE.Vector2();
     this.deathTilt = 0;
+    this.rollAtual = 0;      // a inclinação do olhar, copiada pela câmera da arma
     this.ads = 0;            // 0 pela cintura, 1 na mira de ferro
     this.lean = 0;           // -1 espiando pela esquerda, +1 pela direita
     this.leanReal = 0;       // o quanto a parede deixou inclinar de fato
@@ -44,9 +45,13 @@ export class Player {
     this.vm = null;
   }
 
-  /** O viewmodel só existe depois que os modelos terminam de carregar. */
-  attachViewModel(assets) {
-    this.vm = new ViewModel(assets, this.camera);
+  /**
+   * O viewmodel só existe depois que os modelos terminam de carregar.
+   * Ele pendura numa câmera à parte — a da cena que é desenhada por cima do
+   * mundo, para a arma nunca entrar em parede nenhuma.
+   */
+  attachViewModel(assets, cameraDaArma = this.camera) {
+    this.vm = new ViewModel(assets, cameraDaArma);
     this.vm.visible = this.role === 'hunter';
   }
 
@@ -84,25 +89,20 @@ export class Player {
     this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - m.y * sens));
     this.lastLook.set(m.x / Math.max(dt, 0.001) * 0.02, m.y / Math.max(dt, 0.001) * 0.02);
 
-    // ---- intenção de movimento ----
-    let fwd = 0, side = 0;
-    if (inp.down('KeyW') || inp.down('ArrowUp')) fwd += 1;
-    if (inp.down('KeyS') || inp.down('ArrowDown')) fwd -= 1;
-    if (inp.down('KeyD') || inp.down('ArrowRight')) side += 1;
-    if (inp.down('KeyA') || inp.down('ArrowLeft')) side -= 1;
-    const len = Math.hypot(fwd, side);
-    if (len > 0) { fwd /= len; side /= len; }
+    // ---- intenção de movimento (teclado ou controle na tela) ----
+    const mov = inp.vetorMovimento();
+    const fwd = mov.frente, side = mov.lado, len = mov.tam;
 
     // mira de ferro no botão direito: fecha o ângulo, alenta o mouse e o passo
-    const querMirar = inp.aiming && this.role === 'hunter';
+    const querMirar = inp.mirando() && this.role === 'hunter';
     this.ads += ((querMirar ? 1 : 0) - this.ads) * Math.min(1, dt * 11);
 
     // espiar o canto sem expor o corpo
-    const leanAlvo = (inp.down('KeyE') ? 1 : 0) - (inp.down('KeyQ') ? 1 : 0);
+    const leanAlvo = inp.inclinacao();
     this.lean += (leanAlvo - this.lean) * Math.min(1, dt * 9);
 
-    this.crouching = inp.down('ControlLeft') || inp.down('KeyC');
-    const querCorrer = (inp.down('ShiftLeft') || inp.down('ShiftRight'))
+    this.crouching = inp.agachando();
+    const querCorrer = inp.correndo()
       && !this.crouching && len > 0 && this.ads < 0.4;   // não se corre de arma no olho
     const correndo = querCorrer && this.stamina > 0.05;
     this.correndo = correndo;
@@ -187,7 +187,9 @@ export class Player {
     this.camera.rotateOnWorldAxis(UP, this.yaw);
     this.camera.rotateX(this.pitch + this.recoil * 0.075 * (1 - this.ads * 0.55));
     const roll = -(this.leanReal / CFG.LEAN_DIST) * CFG.LEAN_ROLL;
-    if (roll || this.deathTilt) this.camera.rotateZ(roll + this.deathTilt);
+    // guardado porque a arma vive noutra cena e precisa herdar só a inclinação
+    this.rollAtual = roll + this.deathTilt;
+    if (this.rollAtual) this.camera.rotateZ(this.rollAtual);
 
     // fechar o ângulo é o que dá a sensação de aproximar na mira de ferro
     const fovAlvo = CFG.FOV - (CFG.FOV - CFG.FOV_ADS) * this.ads;

@@ -8,9 +8,14 @@ export const CFG = {
 
   // --- rodada ---
   PHASE_TIME: 30,       // segundos caçando / fugindo
-  ROUNDS_TO_WIN: 2,     // melhor de 3
+  // O ponto é a eliminação, não o tempo dela. Melhor de 3: duas eliminações
+  // levam na hora, e três rodadas fecham a conta. Só empate estica a partida,
+  // e o teto é o que impede o desempate de nunca terminar.
+  ELIM_PARA_VENCER: 2,
+  RODADAS_PADRAO: 3,
+  MAX_RODADAS: 5,
   INTRO_TIME: 3,
-  SWAP_TIME: 2.2,       // pausa curta da troca de papéis
+  SWAP_TIME: 1.4,       // pausa curta da troca de papéis
 
   // --- jogador ---
   EYE_H: 1.62,

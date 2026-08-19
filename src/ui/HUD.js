@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 const $ = id => document.getElementById(id);
 
 /** Toda a interface é DOM: mais leve e mais nítida que desenhar em canvas. */
@@ -10,6 +12,7 @@ export class HUD {
       prompt: $('prompt'), weapon: $('weapon'), cooldown: $('cooldown'),
       stamina: $('stamina'), staminaBar: $('stamina').firstElementChild,
       killfeed: $('killfeed'), flash: $('flash'), noisering: $('noisering'),
+      dicaMouse: $('dicaMouse'),
       bigmsg: $('bigmsg'), crosshair: $('crosshair'),
     };
     this.el.bigSub = this.el.bigmsg.querySelector('.bm-sub');
@@ -35,6 +38,17 @@ export class HUD {
 
   show(v) { this.el.hud.classList.toggle('hidden', !v); }
 
+  /** Mostra por alguns segundos como devolver o mouse ao sistema. */
+  lembrarMouse() {
+    const el = this.el.dicaMouse;
+    el.classList.remove('hidden');
+    el.style.animation = 'none';
+    void el.offsetWidth;                 // reinicia a animação
+    el.style.animation = '';
+    clearTimeout(this._dicaTimer);
+    this._dicaTimer = setTimeout(() => el.classList.add('hidden'), 6200);
+  }
+
   setTimer(sec) {
     const s = Math.max(0, Math.ceil(sec));
     this.el.timer.textContent = `00:${String(s).padStart(2, '0')}`;
@@ -46,15 +60,30 @@ export class HUD {
   }
 
   setRole(role, objective) {
-    this.el.role.textContent = role === 'hunter' ? 'CAÇADOR' : 'FUGITIVO';
+    this.el.role.textContent = t(role === 'hunter' ? 'hud.cacador' : 'hud.fugitivo');
     this.el.objective.textContent = objective;
     this.el.weapon.classList.toggle('hidden', role !== 'hunter');
   }
 
-  setScore(you, bot, roundNum) {
+  /**
+   * O placar: eliminações de cada lado, e em que rodada a partida está.
+   *
+   * São os dois únicos números que decidem alguma coisa, então são os dois
+   * únicos que aparecem. O rótulo embaixo diz o que eles são e quanto falta —
+   * sem ele o jogador vê "1 — 0" e não sabe se aquilo é rodada, ponto ou vida.
+   */
+  setScore(you, bot, roundNum, deQuantas = 3) {
     this.el.scoreYou.textContent = you;
     this.el.scoreBot.textContent = bot;
-    this.el.roundLabel.textContent = `RODADA ${roundNum}`;
+    // passado o melhor de 3, a partida só continua porque empatou: dizer
+    // "RODADA 4 DE 3" seria mentira, e "DESEMPATE" já explica por que ainda
+    // se está jogando
+    this.el.roundLabel.textContent = roundNum > deQuantas
+      ? t('hud.desempate', { n: roundNum })
+      : t('hud.rodadaDe', { n: roundNum, total: deQuantas });
+    // quem já chegou ao alvo aparece aceso, mesmo antes do fim da rodada
+    this.el.scoreYou.classList.toggle('lidera', you > bot);
+    this.el.scoreBot.classList.toggle('lidera', bot > you);
   }
 
   big(sub, main, cls = '') {

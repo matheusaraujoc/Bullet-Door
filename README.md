@@ -22,16 +22,41 @@ guilhotina listrada caindo entre BULLET e DOOR, que é literalmente a porta do
 jogo. As cores são as dos dois papéis — vermelho caçador, ciano fugitivo,
 laranja para porta e ação — todas tiradas da paleta do próprio mundo.
 
-Se você puser `public/images/Kountera_Games_Logo.png`, a abertura usa a
-imagem; sem ela, a marca sai em tipografia.
+A imagem da marca fica em `public/images/Kountera_Games_Logo.png` — só o que
+está em `public/` entra no build. O original tem 3072×2048 e quase 6 MB, mais
+de dez vezes o pacote inteiro do jogo, para algo que aparece três segundos com
+460 px de largura; `npm run logo` gera a versão de 1024 px (239 KB) a partir de
+`images/Kountera_Games_Logo.png`. Sem a imagem, a marca sai em tipografia.
 
 ## A regra que amarra tudo
 
-Uma rodada tem duas metades. Ganha a rodada **quem eliminou mais rápido**.
+Uma rodada tem duas metades: você caça 30 segundos, depois foge 30 segundos.
+**Eliminar vale um ponto.** Nada mais pontua — nem sobreviver, nem ser rápido.
+Como cada rodada dá uma caçada para cada lado, cada lado pode marcar no máximo
+um ponto por rodada.
 
-Isso faz a segunda metade valer alguma coisa: se você caçou e matou em 18
-segundos, agora precisa sobreviver 18 segundos para vencer. O tempo da sua
-caçada vira a sua meta de fuga, e a interface cobra isso o tempo todo.
+A partida é melhor de 3: **duas eliminações levam**, e três rodadas fecham a
+conta mesmo com um placar magro como 1 a 0. Empate estica — 1 a 1 depois de
+duas rodadas vai para a terceira, e o teto de cinco rodadas existe só para o
+desempate não durar para sempre.
+
+Isso dá às duas metades o mesmo objetivo, visto dos dois lados: **caçando você
+marca um ponto, fugindo você nega o dele.** O canto do placar mostra a rodada,
+as duas contagens e o que elas são; a explicação do formato fica no menu, lida
+uma vez, em vez de ocupar canto de tela durante o jogo.
+
+> A regra já foi por tempo — ganhava a rodada quem eliminasse mais rápido, e a
+> sua fuga tinha que durar mais que a sua caçada. Era uma regra que só existia
+> na cabeça de quem escreveu: no meio da fuga ninguém compara dois cronômetros
+> para concluir quem está na frente. Contar eliminação é o que o jogador já faz
+> sozinho. `tools/test-regras.mjs` tem um teste dedicado a isso — duas partidas
+> com os mesmos acertos e tempos opostos precisam terminar idênticas.
+
+**Se ninguém for atingido, a virada não teleporta ninguém.** O relógio zera, os
+papéis se invertem e a caçada continua no ponto exato onde estava: quem
+encurralava passa a ser encurralado, com o oponente na mesma distância de um
+segundo atrás. Recomeçar posições só acontece no início da rodada e depois de
+alguém cair.
 
 Se ninguém acerta ninguém, a rodada segue sem veredito — a troca é o ritmo
 natural da partida.
@@ -56,6 +81,18 @@ canto apertado você vê menos, como seria de esperar.
 **A mira de ferro** fecha o ângulo de visão, quase zera o balanço da arma e
 deixa o mouse mais manso. Em troca, o passo encurta e não dá para correr: é
 troca de mobilidade por precisão, para quando o alvo está longe.
+
+### No toque
+
+Em aparelho de toque os controles aparecem sozinhos (ou force com `?touch`):
+joystick à esquerda para andar, arrastar na metade direita para olhar, e os
+botões de correr, agachar, porta, mira e atirar no canto de baixo. Cada dedo é
+rastreado pelo seu próprio identificador, então dá para andar, olhar e atirar
+ao mesmo tempo.
+
+O **botão de tela cheia** fica no canto de cima à esquerda e vale também no
+computador: em portal o jogo roda num quadro pequeno, e a tela cheia dá espaço
+e ajuda o ponteiro a travar.
 
 ## As portas
 
@@ -148,6 +185,10 @@ npm run test:portas    # nenhuma folha desce sobre quem está no vão
 npm run test:regras    # papéis, placar e desfecho, inclusive 2000 partidas ao acaso
 npm run test:colisao   # ninguém termina dentro de parede, nem com a porta descendo
 npm run test:morte     # o corpo cai de verdade quando abatido
+npm run test:toque     # joystick, botões, tela cheia e a imagem da marca
+npm run test:brilho    # o reflexo da marca clareia de verdade, medido em pixel
+npm run test:placar    # o placar responde quem está ganhando a rodada
+npm run logo           # reduz o logo do estúdio para tamanho de web
 npm run test:mira      # mira de ferro e visada pelos cantos
 npm run test:fuga      # o bot foge mesmo ao bater o olho no caçador
 npm run test:intro     # a abertura roda uma vez, pede os dois áudios e sai
@@ -179,7 +220,15 @@ subir o zip, marcar *"This file will be played in the browser"*, viewport
 **1280×720** com o botão de tela cheia ligado, e *mobile friendly* desmarcado —
 o jogo é de mouse e teclado.
 
-Dois detalhes que fazem o jogo funcionar lá e que é fácil quebrar sem perceber:
+Três detalhes que fazem o jogo funcionar lá e que é fácil quebrar sem perceber:
+
+- **O zip precisa usar barra normal nos caminhos internos.** O
+  `Compress-Archive` do Windows PowerShell 5.1 grava com barra invertida, o que
+  o formato ZIP não permite. Quem descompacta um pacote assim cria um arquivo
+  chamado literalmente `assetsindex.css` na raiz, em vez da pasta `assets` com
+  o arquivo dentro — e o jogo sobe **sem CSS e sem JS**, mostrando só o HTML
+  cru. Por isso o pacote é escrito por [tools/zip.mjs](tools/zip.mjs), sem
+  depender de ferramenta externa.
 
 - **Caminhos relativos.** O portal serve o jogo de uma subpasta funda, então
   tudo é resolvido a partir do `index.html` (`base: './'` no Vite e o helper
@@ -188,9 +237,11 @@ Dois detalhes que fazem o jogo funcionar lá e que é fácil quebrar sem percebe
 - **O clique de entrada.** Navegador nenhum toca áudio antes de uma interação,
   e a abertura depende de dois sons entrando na hora certa.
 
-`npm run test:itch` sobe o build numa subpasta dentro de um iframe com o mesmo
-sandbox do portal e confere que os modelos chegam, a partida começa e a cena é
-desenhada — é o ensaio da publicação.
+`npm run test:itch` reempacota e sobe **o próprio zip** numa subpasta dentro de
+um iframe com o mesmo sandbox do portal, conferindo que a folha de estilo
+chegou, que os modelos carregaram, que a partida começa e que a cena é
+desenhada. Testar a pasta `dist/` não bastava: ela estava perfeita quando o
+pacote subiu quebrado.
 
 ## Como está montado
 

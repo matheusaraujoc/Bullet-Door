@@ -235,10 +235,11 @@ function fakeGame() {
     audio: { play: () => {} },
     buildLevel() { log.push('build'); },
     placeCombatants(role) { log.push(`place:${role}`); },
+    trocarPapeis(role) { log.push(`troca:${role}`); },
     onHalfPrepared(role, half) { log.push(`prep:${role}:${half}`); },
     onHalfStarted(role) { log.push(`start:${role}`); },
     onHalfEnded(role, killed, t) { log.push(`end:${role}:${killed ? t.toFixed(1) : 'timeout'}`); },
-    onRoundEnded(w) { log.push(`round:${w}`); },
+    onRoundEnded(seu, bot) { log.push(`round:${seu}-${bot}`); },
     onMatchEnded(w) { log.push(`match:${w}`); },
   };
 }
@@ -277,16 +278,24 @@ function simulate(killAt, maxSteps = 60000) {
 {
   const { rm } = simulate(() => null);
   ok(rm.state === 'matchend', 'partida sem eliminação não terminou');
-  ok(rm.round === 5, `parou na rodada ${rm.round} (esperado 5)`);
-  ok(rm.scoreYou === 0 && rm.scoreBot === 0, 'empate não deveria pontuar');
+  ok(rm.round === CFG.MAX_RODADAS, `parou na rodada ${rm.round} (esperado ${CFG.MAX_RODADAS})`);
+  ok(rm.scoreYou === 0 && rm.scoreBot === 0, 'ninguém eliminou, ninguém devia pontuar');
 }
 {
-  const { rm } = simulate(role => (role === 'hunter' ? 9 : 4));
-  ok(rm.scoreBot === 2, `bot mais rápido deveria vencer (${rm.scoreYou}-${rm.scoreBot})`);
+  // ponto é eliminação, não velocidade: eliminar em 4s ou em 9s dá o mesmo
+  const rapido = simulate(role => (role === 'hunter' ? 4 : 9));
+  const lento = simulate(role => (role === 'hunter' ? 9 : 4));
+  ok(rapido.rm.scoreYou === lento.rm.scoreYou && rapido.rm.scoreBot === lento.rm.scoreBot,
+    `o relógio mudou o placar: ${rapido.rm.scoreYou}-${rapido.rm.scoreBot} contra ` +
+    `${lento.rm.scoreYou}-${lento.rm.scoreBot}`);
+  ok(rapido.rm.scoreYou === rapido.rm.scoreBot,
+    `os dois eliminaram sempre, devia empatar (${rapido.rm.scoreYou}-${rapido.rm.scoreBot})`);
 }
 {
-  const { rm } = simulate(role => (role === 'hunter' ? 4 : 9));
-  ok(rm.scoreYou === 2, `você mais rápido deveria vencer (${rm.scoreYou}-${rm.scoreBot})`);
+  // uma eliminação a mais basta, mesmo sem ninguém chegar ao alvo
+  const { rm } = simulate((role, rodada) => (role === 'hunter' && rodada === 1 ? 5 : null));
+  ok(rm.scoreYou === 1 && rm.scoreBot === 0, `placar ${rm.scoreYou}-${rm.scoreBot} (esperado 1-0)`);
+  ok(rm.round === CFG.RODADAS_PADRAO, `o melhor de 3 devia fechar na rodada 3 (fechou na ${rm.round})`);
 }
 
 // sem eliminação a troca é imediata: nada de tela de veredito no meio
@@ -325,13 +334,14 @@ function simulate(killAt, maxSteps = 60000) {
   }
 }
 {
+  // a eliminação entra no placar na hora, não no fechamento da rodada
   const g = fakeGame();
   const rm = new RoundManager(g);
   rm.startMatch();
-  rm.half = 1; rm.youTime = 12.5;
-  ok(rm.survivalTarget === 12.5, `meta ${rm.survivalTarget} (esperado 12.5)`);
-  rm.youTime = null;
-  ok(rm.survivalTarget === null, 'sem eliminação a meta é o tempo cheio');
+  rm.state = 'playing'; rm.phaseTime = 12;
+  rm.registerKill();
+  ok(rm.scoreYou === 1, `caçando e eliminando, o placar devia ir a 1 (foi ${rm.scoreYou})`);
+  ok(rm.pontoSeu === 1 && rm.pontoBot === 0, `pontos da rodada ${rm.pontoSeu}-${rm.pontoBot}`);
 }
 ok(CFG.PHASE_TIME * 2 <= 90 && CFG.PHASE_TIME * 2 >= 30, 'rodada fora da janela de 30–90s');
 

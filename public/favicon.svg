@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    Duas formas, e nada mais: um ladrilho laranja com a porta recortada dentro,
+    e o furo da bala vazado no meio dela.
+
+    A porta é o vazio, não o desenho. Foi o que fez a diferença a 16 pixels, que
+    é o tamanho em que este arquivo passa a vida: com a porta laranja sobre
+    fundo escuro, o ícone inteiro sumia numa aba de tema escuro. Com o ladrilho
+    laranja carregando a silhueta, ele lê contra qualquer fundo.
+  -->
+  <rect width="64" height="64" rx="15" fill="#f77622"/>
+  <path fill="#12131c" fill-rule="evenodd"
+        d="M32 10a16 16 0 0 1 16 16v30H16V26a16 16 0 0 1 16-16zm0 22a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/>
+</svg>

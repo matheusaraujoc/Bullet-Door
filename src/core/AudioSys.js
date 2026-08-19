@@ -1,13 +1,119 @@
+import { asset } from './assets-url.js';
+
+/** Onde a preferência de cada trilha fica guardada entre sessões. */
+const CHAVE_SOM = 'bulletdoor.som';
+const CHAVE_MUSICA = 'bulletdoor.musica';
+
+const lerPreferencia = (chave, padrao) => {
+  try {
+    const v = localStorage.getItem(chave);
+    return v === null ? padrao : v === '1';
+  } catch { return padrao; }        // navegação privada pode barrar o storage
+};
+const gravarPreferencia = (chave, v) => {
+  try { localStorage.setItem(chave, v ? '1' : '0'); } catch { /* sem storage */ }
+};
+
 /**
- * Todo o som é sintetizado na hora: nenhum arquivo de áudio para baixar.
- * Posicionamento é feito à mão (pan + atenuação) — mais barato que PannerNode
- * e suficiente para o que o jogo precisa: "veio da esquerda, longe".
+ * Som do jogo.
+ *
+ * Os efeitos são todos sintetizados na hora — osciladores e um buffer de ruído,
+ * nenhum arquivo para baixar. Isso é o que faz o tiro soar igual em qualquer
+ * aparelho: não há som do sistema envolvido, e o navegador não escolhe nada. A
+ * única coisa que muda de um aparelho para outro é o alto-falante.
+ *
+ * Posicionamento é feito à mão (pan + atenuação) — mais barato que PannerNode e
+ * suficiente para o que o jogo precisa: "veio da esquerda, longe".
+ *
+ * A música é a exceção: é arquivo, e por isso toca por um `<audio>` que
+ * transmite aos poucos em vez de decodificar meio mega na memória. As duas
+ * trilhas se desligam separadamente, porque são incômodos diferentes — quem
+ * está ouvindo outra coisa quer só a música fora, e quem está num lugar
+ * silencioso quer tudo fora.
  */
 export class AudioSys {
   constructor() {
     this.ctx = null;
     this.master = null;
     this.enabled = true;
+    this.somLigado = lerPreferencia(CHAVE_SOM, true);
+    this.musicaLigada = lerPreferencia(CHAVE_MUSICA, true);
+    this.musica = null;
+    this.musicaUrl = null;
+    this.aoMudar = null;          // avisa a interface para redesenhar os botões
+  }
+
+  // ------------------------------------------------------------ liga/desliga
+  ligarSom(v) {
+    this.somLigado = !!v;
+    gravarPreferencia(CHAVE_SOM, this.somLigado);
+    this.aoMudar?.();
+  }
+
+  ligarMusica(v) {
+    this.musicaLigada = !!v;
+    gravarPreferencia(CHAVE_MUSICA, this.musicaLigada);
+    if (this.musicaLigada) this._retomarMusica(); else this._pausarMusica();
+    this.aoMudar?.();
+  }
+
+  alternarSom() { this.ligarSom(!this.somLigado); }
+  alternarMusica() { this.ligarMusica(!this.musicaLigada); }
+
+  // ---------------------------------------------------------------- música
+  /**
+   * Começa (ou troca) a música de fundo.
+   *
+   * O `<audio>` é criado na primeira chamada e reaproveitado: recriar o
+   * elemento a cada ida ao menu recomeçaria o download toda vez.
+   */
+  tocarMusica(arquivo) {
+    const url = asset(arquivo);
+    if (!this.musica) {
+      const el = document.createElement('audio');
+      el.loop = true;
+      el.preload = 'none';        // o menu aparece primeiro; a música chega depois
+      el.volume = 0;
+      this.musica = el;
+    }
+    if (this.musicaUrl !== url) {
+      this.musica.src = url;
+      this.musicaUrl = url;
+    }
+    if (this.musicaLigada) this._retomarMusica();
+  }
+
+  pararMusica() {
+    if (!this.musica) return;
+    this._esmaecer(0, 0.5, () => { this.musica.pause(); this.musica.currentTime = 0; });
+  }
+
+  _retomarMusica() {
+    if (!this.musica || !this.musicaUrl) return;
+    // pode ser recusado até o primeiro toque na página; não é erro que valha ruído
+    this.musica.play().then(() => this._esmaecer(this.volumeMusica, 1.2), () => {});
+  }
+
+  _pausarMusica() {
+    if (!this.musica) return;
+    this._esmaecer(0, 0.35, () => this.musica.pause());
+  }
+
+  get volumeMusica() { return 0.42; }
+
+  /** Sobe ou desce o volume aos poucos: corte seco em música soa como falha. */
+  _esmaecer(alvo, segundos, aoFim) {
+    const el = this.musica;
+    if (!el) return;
+    clearInterval(this._fade);
+    const passo = 1 / 30;
+    const delta = (alvo - el.volume) / Math.max(1, segundos / passo);
+    this._fade = setInterval(() => {
+      const v = el.volume + delta;
+      const chegou = delta >= 0 ? v >= alvo : v <= alvo;
+      el.volume = Math.max(0, Math.min(1, chegou ? alvo : v));
+      if (chegou) { clearInterval(this._fade); aoFim?.(); }
+    }, passo * 1000);
   }
 
   init() {
@@ -71,7 +177,7 @@ export class AudioSys {
    * @param {{vol?:number, pan?:number}} opt
    */
   play(kind, opt = {}) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.somLigado) return;
     this.init();
     if (!this.ctx) return;
     const vol = opt.vol ?? 1, pan = opt.pan;
@@ -128,6 +234,28 @@ export class AudioSys {
         break;
       }
       case 'click': { const g = this._chain(0.3 * vol); this._tone(g, 1200, 0.04, 'square'); break; }
+
+      /*
+       * Fim de partida. Os toques de rodada ('win'/'lose') são curtos de
+       * propósito, porque acontecem no meio do jogo; estes dois podem ocupar
+       * espaço, e devem — é o único momento em que a partida inteira acabou.
+       */
+      case 'vitoria': {
+        const g = this._chain(0.6 * vol);
+        // acorde subindo e alargando, com o baixo firmando embaixo
+        [[523, 0], [659, 90], [784, 180], [1046, 270], [1319, 400]].forEach(([f, ms]) =>
+          setTimeout(() => { this._tone(g, f, 0.55, 'triangle'); this._tone(g, f * 2, 0.3, 'sine'); }, ms));
+        setTimeout(() => this._tone(g, 131, 1.1, 'triangle'), 270);
+        break;
+      }
+      case 'derrota': {
+        const g = this._chain(0.6 * vol);
+        // desce em menor e desafina no fim: o som de algo desligando
+        [[392, 0], [311, 190], [262, 380]].forEach(([f, ms]) =>
+          setTimeout(() => this._tone(g, f, 0.5, 'triangle'), ms));
+        setTimeout(() => { this._tone(g, 196, 1.4, 'sawtooth', 92); this._noiseBurst(g, 0.7, 240, 0.8, 'lowpass'); }, 520);
+        break;
+      }
     }
   }
 

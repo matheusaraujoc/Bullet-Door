@@ -4,7 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Bullet Door</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128682;</text></svg >" />
+<!-- A marca do jogo em miniatura: o vão da porta, a guilhotina laranja
+        descendo, e o furo de bala. Emoji fica à mercê da fonte do sistema e
+        muda de cara em cada aparelho; este desenho é sempre o mesmo. -->
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet"
@@ -20,33 +23,35 @@
 
     <div id="top">
       <div class="painel">
-        <div id="role">CAÇADOR</div>
+        <div id="role" data-i18n="hud.cacador">CAÇADOR</div>
         <div id="timer">00:30</div>
         <div id="phasebar"><i></i></div>
       </div>
-      <div id="objective">ENCONTRE E ELIMINE</div>
+      <div id="objective" data-i18n="hud.objCacar">ELIMINE — VALE UM PONTO</div>
     </div>
 
     <div id="score">
       <div class="painel">
-        <div class="s-round" id="roundLabel">RODADA 1</div>
+        <div class="s-round" id="roundLabel">RODADA 1 DE 3</div>
         <div class="s-linha">
-          <span class="s-lab">VOCÊ</span><span class="s-val" id="scoreYou">0</span>
-          <span class="s-x">·</span>
-          <span class="s-val" id="scoreBot">0</span><span class="s-lab">BOT</span>
+          <span class="s-lab" data-i18n="hud.voce">VOCÊ</span><span class="s-val" id="scoreYou">0</span>
+          <span class="s-x">—</span>
+          <span class="s-val" id="scoreBot">0</span><span class="s-lab" data-i18n="hud.inimigo">INIMIGO</span>
         </div>
+        <div class="s-nota" data-i18n="hud.nota">ELIMINAÇÕES · 2 LEVAM A PARTIDA</div>
       </div>
     </div>
 
     <!-- indicador de ruído direcional -->
     <div id="noisering"></div>
 
-    <div id="prompt" class="hidden">[E] PORTA</div>
+    <div id="prompt" class="hidden" data-i18n="hud.porta">[E] PORTA</div>
     <div id="weapon" class="hidden"><b>∞</b><span id="cooldown"></span></div>
 
     <div id="stamina"><i></i></div>
 
     <div id="killfeed"></div>
+    <div id="dicaMouse" class="hidden"><kbd>ESC</kbd> <span data-i18n="hud.soltaMouse">solta o mouse</span></div>
     <div id="flash"></div>
     <div id="vignette"></div>
     <div id="bigmsg" class="hidden"><div class="bm-sub"></div><div class="bm-main"></div></div>
@@ -61,40 +66,63 @@
         <span class="guilhotina"></span>
         <span class="linha-2">DOOR</span>
       </div>
-      <p class="tag">Um tiro mata.<br>Trinta segundos caçando, trinta fugindo.</p>
-      <button id="btnPlay">JOGAR</button>
+      <p class="tag"><span data-i18n="menu.lema1">Um tiro mata.</span><br><span data-i18n="menu.lema2">Trinta segundos caçando, trinta fugindo.</span></p>
+      <p class="regra" data-i18n-html="menu.regra">Cada <b>rodada</b> te dá uma caçada e uma fuga.</p>
+      <button id="btnPlay" data-i18n="menu.jogar">JOGAR</button>
       <div class="keys">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>mover</em></div>
-        <div><kbd>SHIFT</kbd><em>correr — faz barulho longe</em></div>
-        <div><kbd>CTRL</kbd><em>agachar — silencioso e difícil de ver</em></div>
-        <div><kbd>Q</kbd><kbd>E</kbd><em>espiar pela esquerda e pela direita</em></div>
-        <div><kbd>F</kbd><em>abrir e fechar portas</em></div>
-        <div><kbd>CLIQUE</kbd><em>atirar — munição infinita</em></div>
-        <div><kbd>BOTÃO&nbsp;DIREITO</kbd><em>mira de ferro</em></div>
-        <div><kbd>ESC</kbd><em>pausar</em></div>
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em data-i18n="ctrl.mover">mover</em></div>
+        <div><kbd>SHIFT</kbd><em data-i18n="ctrl.correr">correr</em></div>
+        <div><kbd>C</kbd><em data-i18n="ctrl.agachar">agachar</em></div>
+        <div><kbd>Q</kbd><kbd>E</kbd><em data-i18n="ctrl.espiar">espiar pelos cantos</em></div>
+        <div><kbd>F</kbd><em data-i18n="ctrl.portas">abrir e fechar portas</em></div>
+        <div><kbd data-i18n="ctrl.clique">CLIQUE</kbd><em data-i18n="ctrl.atirar">atirar</em></div>
+        <div><kbd data-i18n="ctrl.botaoDireito">BOTÃO DIREITO</kbd><em data-i18n="ctrl.mira">mira de ferro</em></div>
+        <div><kbd>ESC</kbd><em data-i18n="ctrl.pausar">pausar</em></div>
       </div>
-      <div class="hint">clique na tela para travar o mouse</div>
+      <div class="keys-toque">
+        <div><b data-i18n="ctrl.esquerda">ESQUERDA</b><em data-i18n="ctrl.tqJoystick">joystick: andar</em></div>
+        <div><b data-i18n="ctrl.direita">DIREITA</b><em data-i18n="ctrl.tqOlhar">arraste: olhar</em></div>
+        <div><b data-i18n="bt.atirar">ATIRAR</b><em data-i18n="ctrl.tqAtirar">munição infinita</em></div>
+        <div><b data-i18n="bt.mira">MIRA</b><em data-i18n="ctrl.tqMira">fecha o ângulo</em></div>
+        <div><b data-i18n="bt.porta">PORTA</b><em data-i18n="ctrl.tqPorta">abre e fecha por perto</em></div>
+        <div><b>&#10094; &#10095;</b><em data-i18n="ctrl.tqEspiar">espiar pelos cantos</em></div>
+      </div>
+      <div class="hint" data-i18n-html="menu.dica"></div>
+      <div class="hint-toque" data-i18n="menu.dicaToque"></div>
+      <div id="idiomas" class="idiomas"></div>
       <div class="selo">KOUNTERA GAMES</div>
     </div>
   </div>
 
   <div id="pause" class="hidden">
     <div class="m-card">
-      <h2>PAUSADO</h2>
-      <button id="btnResume">CONTINUAR</button>
-      <button id="btnQuit" class="ghost">SAIR DA PARTIDA</button>
+      <h2 data-i18n="pausa.titulo">PAUSADO</h2>
+      <p class="tag" data-i18n-html="pausa.texto"></p>
+      <button id="btnResume" data-i18n="pausa.continuar">CONTINUAR</button>
+      <button id="btnQuit" class="ghost" data-i18n="pausa.sair">SAIR DA PARTIDA</button>
     </div>
   </div>
 
   <div id="matchend" class="hidden">
+    <canvas id="meArte"></canvas>
+    <canvas id="meFesta"></canvas>
     <div class="m-card">
+      <div id="meFaixa"></div>
+      <div id="meLamina"></div>
       <h2 id="meTitle">VITÓRIA</h2>
-      <div id="meScore">2 — 1</div>
-      <button id="btnAgain">JOGAR NOVAMENTE</button>
+      <div id="meScore">
+        <span class="me-lado"><b data-i18n="hud.voce">VOCÊ</b><i id="meVoce">0</i></span>
+        <span class="me-tr">—</span>
+        <span class="me-lado"><b data-i18n="hud.inimigo">INIMIGO</b><i id="meBot">0</i></span>
+      </div>
+      <div class="me-nota" data-i18n="fim.eliminacoes">ELIMINAÇÕES</div>
+      <div id="meRodadas"></div>
+      <button id="btnAgain" data-i18n="fim.novamente">JOGAR NOVAMENTE</button>
+      <button id="btnMenu" class="ghost" data-i18n="fim.menu">VOLTAR AO MENU</button>
     </div>
   </div>
 
-  <div id="loading">CARREGANDO<span class="dots"></span></div>
+  <div id="loading"><span data-i18n="menu.carregando">CARREGANDO</span><span class="dots"></span></div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

@@ -1,16 +1,23 @@
-// Simula a hospedagem do itch.io: o build servido de uma SUBPASTA e dentro de
-// um iframe com sandbox, que é como o portal entrega o jogo.
-//   node tools/build:itch primeiro, ou npm run build
-//   node tools/test-itch.mjs
+// Ensaio da publicação: serve O PRÓPRIO ZIP que vai para o itch.io, de uma
+// SUBPASTA funda e dentro de um iframe com sandbox — que é como o portal
+// entrega o jogo.
+//
+// Testar a pasta dist/ não bastava: o pacote saiu daqui uma vez com os caminhos
+// internos usando barra invertida (herança do Compress-Archive do PowerShell) e
+// o jogo subiu sem CSS nem JS, com o dist perfeito. Quem vai para o ar é o zip,
+// então é o zip que se testa.
+//   npm run test:itch
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'node:http';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { extname } from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 
 const exe = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
              'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
 const PORT = 5171;
-// o caminho fundo de propósito: é assim que o portal serve
+const PACOTE = 'bullet-door-web.zip';
+// caminho fundo de propósito: é assim que o portal serve
 const SUB = '/html/1234567/bullet-door';
 
 const TIPOS = {
@@ -19,9 +26,62 @@ const TIPOS = {
   '.json': 'application/json', '.svg': 'image/svg+xml',
 };
 
-/** Servidor estático mínimo, servindo dist/ debaixo de SUB. */
+/** Lê um zip inteiro para a memória: caminho -> conteúdo. */
+function lerZip(caminho) {
+  const buf = readFileSync(caminho);
+  // acha o fim do diretório central, varrendo de trás para frente
+  let fim = -1;
+  for (let i = buf.length - 22; i >= 0 && fim < 0; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) fim = i;
+  }
+  if (fim < 0) throw new Error('zip inválido: sem diretório central');
+  const total = buf.readUInt16LE(fim + 10);
+  let p = buf.readUInt32LE(fim + 16);
+
+  const arquivos = new Map();
+  for (let n = 0; n < total; n++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('entrada corrompida no zip');
+    const metodo = buf.readUInt16LE(p + 10);
+    const tamComp = buf.readUInt32LE(p + 20);
+    const tamNome = buf.readUInt16LE(p + 28);
+    const tamExtra = buf.readUInt16LE(p + 30);
+    const tamCom = buf.readUInt16LE(p + 32);
+    const offset = buf.readUInt32LE(p + 42);
+    const nome = buf.toString('utf8', p + 46, p + 46 + tamNome);
+
+    // pula o cabeçalho local para chegar aos dados
+    const nomeLocal = buf.readUInt16LE(offset + 26);
+    const extraLocal = buf.readUInt16LE(offset + 28);
+    const ini = offset + 30 + nomeLocal + extraLocal;
+    const dados = buf.subarray(ini, ini + tamComp);
+    arquivos.set(nome, metodo === 0 ? dados : inflateRawSync(dados));
+
+    p += 46 + tamNome + tamExtra + tamCom;
+  }
+  return arquivos;
+}
+
+if (!existsSync(PACOTE)) {
+  console.error(`${PACOTE} não existe — rode "npm run itch" antes.`);
+  process.exit(1);
+}
+const conteudo = lerZip(PACOTE);
+
+// O pacote precisa abrir por index.html na raiz, e sem nome torto. Estas duas
+// checagens são as que pegariam de novo o erro que derrubou a primeira subida.
+const tortos = [...conteudo.keys()].filter(k => k.includes('\\'));
+if (tortos.length) {
+  console.error('caminho com barra invertida dentro do zip:', tortos.slice(0, 5));
+  process.exit(1);
+}
+if (!conteudo.has('index.html')) {
+  console.error('o zip não tem index.html na raiz — o portal não saberia o que abrir');
+  process.exit(1);
+}
+
+/** Servidor estático mínimo, servindo o ZIP debaixo de SUB. */
 const servidor = createServer((req, res) => {
-  let url = decodeURIComponent(req.url.split('?')[0]);
+  const url = decodeURIComponent(req.url.split('?')[0]);
   if (url === '/') {
     // a página de fora, que embute o jogo igual ao portal faz
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -34,13 +94,12 @@ const servidor = createServer((req, res) => {
     return;
   }
   if (!url.startsWith(SUB)) { res.writeHead(404); res.end('fora da subpasta'); return; }
-  const rel = url.slice(SUB.length) || '/index.html';
-  const arquivo = normalize(join('dist', rel === '/' ? '/index.html' : rel));
-  if (!arquivo.startsWith('dist') || !existsSync(arquivo) || !statSync(arquivo).isFile()) {
-    res.writeHead(404); res.end('não achei ' + rel); return;
-  }
-  res.writeHead(200, { 'Content-Type': TIPOS[extname(arquivo)] || 'application/octet-stream' });
-  res.end(readFileSync(arquivo));
+  let rel = url.slice(SUB.length).replace(/^\//, '');
+  if (rel === '') rel = 'index.html';
+  const dados = conteudo.get(rel);
+  if (!dados) { res.writeHead(404); res.end('não achei ' + rel); return; }
+  res.writeHead(200, { 'Content-Type': TIPOS[extname(rel)] || 'application/octet-stream' });
+  res.end(dados);
 });
 await new Promise(r => servidor.listen(PORT, r));
 
@@ -52,9 +111,9 @@ await p.setViewport({ width: 1280, height: 720 });
 const erros = [], faltando = [];
 p.on('pageerror', e => erros.push('PAGEERROR: ' + e.message));
 p.on('console', m => {
-  const t = m.text();
   if (m.type() !== 'error') return;
-  if (/404|Failed to load resource/.test(t)) return;   // já contados acima
+  const t = m.text();
+  if (/404|Failed to load resource/.test(t)) return;   // já contados abaixo
   erros.push(t);
 });
 p.on('response', r => {
@@ -65,7 +124,7 @@ p.on('response', r => {
   if (r.status() >= 400) faltando.push(`${r.status()} ${nome}`);
 });
 
-console.log(`servindo dist/ em http://localhost:${PORT}${SUB}/\n`);
+console.log(`servindo ${PACOTE} (${conteudo.size} arquivos) em http://localhost:${PORT}${SUB}/\n`);
 await p.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle2' });
 
 // tudo daqui para baixo acontece DENTRO do iframe, como no portal
@@ -77,6 +136,21 @@ check(!!quadro, 'o jogo não carregou dentro do iframe');
 if (quadro) {
   await quadro.waitForFunction(() => !!document.getElementById('intro'), { timeout: 30000 })
     .catch(() => {});
+
+  // A prova de que o CSS chegou: sem ele a folha de estilo não existe e o HUD
+  // aparece como texto cru — que foi exatamente o que o portal mostrou.
+  const estilo = await quadro.evaluate(() => {
+    const el = document.querySelector('#hud') || document.body;
+    return {
+      folhas: document.styleSheets.length,
+      hudEscondido: getComputedStyle(document.getElementById('hud')).display === 'none',
+      fundoCorpo: getComputedStyle(document.body).backgroundColor,
+    };
+  });
+  console.log('estilo:', JSON.stringify(estilo));
+  check(estilo.folhas > 0, 'nenhuma folha de estilo carregou (o CSS não chegou)');
+  check(estilo.hudEscondido, 'o HUD não está escondido — o CSS não foi aplicado');
+
   await p.screenshot({ path: 'tools/_itch_1_entrada.png' });
   console.log('  tools/_itch_1_entrada.png');
 
@@ -111,7 +185,7 @@ if (quadro) {
       pointerLockPermitido: typeof document.body.requestPointerLock === 'function',
     };
   });
-  console.log('\nestado dentro do iframe:', JSON.stringify(estado, null, 1));
+  console.log('estado dentro do iframe:', JSON.stringify(estado));
   check(estado.modelosProntos && estado.temPersonagem && estado.temArma,
     'algum recurso não chegou');
   check(estado.draw > 5 && estado.tri > 1000, 'a cena não está sendo desenhada');
@@ -126,6 +200,6 @@ if (erros.length) { falhas++; console.log('\nERROS:'); erros.slice(0, 6).forEach
 
 await b.close();
 servidor.close();
-console.log(falhas ? `\n${falhas} FALHA(S) — ainda não está pronto para o portal\n`
-                   : '\nRODA EM SUBPASTA E DENTRO DE IFRAME\n');
+console.log(falhas ? `\n${falhas} FALHA(S) — o pacote não está pronto para o portal\n`
+                   : '\nO PACOTE RODA EM SUBPASTA E DENTRO DE IFRAME\n');
 process.exit(falhas ? 1 : 0);
