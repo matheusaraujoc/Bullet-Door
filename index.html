@@ -28,15 +28,16 @@
         <div id="phasebar"><i></i></div>
       </div>
       <div id="objective" data-i18n="hud.objCacar">ELIMINE — VALE UM PONTO</div>
+      <div id="killfeed"></div>
     </div>
 
     <div id="score">
       <div class="painel">
         <div class="s-round" id="roundLabel">RODADA 1 DE 3</div>
         <div class="s-linha">
-          <span class="s-lab" data-i18n="hud.voce">VOCÊ</span><span class="s-val" id="scoreYou">0</span>
+          <span class="s-lab" data-i18n="hud.voce">VOCÊ</span><span class="s-val" id="scoreYou">0</span><i class="s-pend" id="pendYou"></i>
           <span class="s-x">—</span>
-          <span class="s-val" id="scoreBot">0</span><span class="s-lab" data-i18n="hud.inimigo">INIMIGO</span>
+          <i class="s-pend" id="pendBot"></i><span class="s-val" id="scoreBot">0</span><span class="s-lab" data-i18n="hud.inimigo">INIMIGO</span>
         </div>
         <div class="s-nota" data-i18n="hud.nota">ELIMINAÇÕES · 2 LEVAM A PARTIDA</div>
       </div>
@@ -50,7 +51,6 @@
 
     <div id="stamina"><i></i></div>
 
-    <div id="killfeed"></div>
     <div id="dicaMouse" class="hidden"><kbd>ESC</kbd> <span data-i18n="hud.soltaMouse">solta o mouse</span></div>
     <div id="flash"></div>
     <div id="vignette"></div>

@@ -64,7 +64,7 @@ const IDIOMAS = {
     'hud.nota': 'ELIMINAÇÕES · 2 LEVAM A PARTIDA',
     'hud.porta': '[E] PORTA',
     'hud.soltaMouse': 'solta o mouse',
-    'hud.alvoAbatido': 'ALVO ABATIDO',
+    'hud.alvoAbatido': 'ALVO ELIMINADO',
     'hud.passouPerto': 'PASSOU PERTO',
 
     // ---- momentos da partida
@@ -78,10 +78,11 @@ const IDIOMAS = {
     'jogo.foiAbatido': 'VOCÊ FOI ABATIDO',
     'jogo.pontoSeu': '+1 PARA VOCÊ',
     'jogo.pontoDele': '+1 PARA O INIMIGO',
-    'jogo.osDois': 'ELIMINARAM OS DOIS',
-    'jogo.vocePontuou': 'VOCÊ ELIMINOU E SOBREVIVEU',
-    'jogo.elePontuou': 'O INIMIGO ELIMINOU',
-    'jogo.ninguem': 'OS DOIS SOBREVIVERAM',
+    // as quatro combinações da rodada, ditas do ponto de vista de quem joga
+    'jogo.rodadaLimpa': 'VOCÊ ELIMINOU E SOBREVIVEU',
+    'jogo.rodadaTrocada': 'VOCÊ ELIMINOU, MAS CAIU NA FUGA',
+    'jogo.rodadaVazia': 'NINGUÉM ACERTOU O ALVO',
+    'jogo.rodadaPerdida': 'VOCÊ ERROU A CAÇADA E CAIU NA FUGA',
     'jogo.placar': 'VOCÊ {seu} — {dele} INIMIGO',
 
     // ---- fim de partida
@@ -161,7 +162,7 @@ const IDIOMAS = {
     'hud.nota': 'ELIMINACIONES · 2 GANAN LA PARTIDA',
     'hud.porta': '[E] PUERTA',
     'hud.soltaMouse': 'suelta el ratón',
-    'hud.alvoAbatido': 'OBJETIVO ABATIDO',
+    'hud.alvoAbatido': 'OBJETIVO ELIMINADO',
     'hud.passouPerto': 'PASÓ CERCA',
 
     'jogo.rodada': 'RONDA {n}',
@@ -174,10 +175,10 @@ const IDIOMAS = {
     'jogo.foiAbatido': 'TE HAN ABATIDO',
     'jogo.pontoSeu': '+1 PARA TI',
     'jogo.pontoDele': '+1 PARA EL ENEMIGO',
-    'jogo.osDois': 'ELIMINARON LOS DOS',
-    'jogo.vocePontuou': 'ELIMINASTE Y SOBREVIVISTE',
-    'jogo.elePontuou': 'EL ENEMIGO ELIMINÓ',
-    'jogo.ninguem': 'SOBREVIVIERON LOS DOS',
+    'jogo.rodadaLimpa': 'ELIMINASTE Y SOBREVIVISTE',
+    'jogo.rodadaTrocada': 'ELIMINASTE, PERO CAÍSTE HUYENDO',
+    'jogo.rodadaVazia': 'NADIE ACERTÓ',
+    'jogo.rodadaPerdida': 'FALLASTE LA CAZA Y CAÍSTE HUYENDO',
     'jogo.placar': 'TÚ {seu} — {dele} ENEMIGO',
 
     'fim.vitoria': 'VICTORIA',
@@ -255,7 +256,7 @@ const IDIOMAS = {
     'hud.nota': 'KILLS · 2 WIN THE MATCH',
     'hud.porta': '[E] DOOR',
     'hud.soltaMouse': 'releases the mouse',
-    'hud.alvoAbatido': 'TARGET DOWN',
+    'hud.alvoAbatido': 'TARGET ELIMINATED',
     'hud.passouPerto': 'CLOSE ONE',
 
     'jogo.rodada': 'ROUND {n}',
@@ -268,10 +269,10 @@ const IDIOMAS = {
     'jogo.foiAbatido': 'YOU WERE KILLED',
     'jogo.pontoSeu': '+1 FOR YOU',
     'jogo.pontoDele': '+1 FOR THE ENEMY',
-    'jogo.osDois': 'BOTH SCORED',
-    'jogo.vocePontuou': 'YOU KILLED AND SURVIVED',
-    'jogo.elePontuou': 'THE ENEMY SCORED',
-    'jogo.ninguem': 'BOTH SURVIVED',
+    'jogo.rodadaLimpa': 'YOU KILLED AND SURVIVED',
+    'jogo.rodadaTrocada': 'YOU KILLED, THEN DIED FLEEING',
+    'jogo.rodadaVazia': 'NOBODY LANDED A SHOT',
+    'jogo.rodadaPerdida': 'YOU MISSED YOUR HUNT AND DIED FLEEING',
     'jogo.placar': 'YOU {seu} — {dele} ENEMY',
 
     'fim.vitoria': 'VICTORY',

@@ -38,6 +38,99 @@ const lambert = (opts = {}) => new THREE.MeshLambertMaterial({ color: 0xffffff, 
  * assada nas cores de instância: o cenário inteiro sai em ~10 draw calls e
  * nenhuma luz dinâmica pesa no quadro.
  */
+/**
+ * Onde ficam as luminárias.
+ *
+ * Sala tem luz forte no meio, e uma segunda num canto se for grande. Corredor é
+ * penumbra: luminária esparsa e fraca. Essa diferença entre sala clara e
+ * corredor escuro é de gameplay, não só de enfeite — é onde o fugitivo some e
+ * onde o caçador precisa chegar perto para ter certeza.
+ *
+ * Devolve só posição e intensidade; a cor entra depois, porque depende de
+ * THREE e isto aqui precisa rodar fora do navegador para ser conferido.
+ */
+export function planejarLuminarias(map) {
+  const rnd = mulberry32(map.seed ^ 0x1a3b);
+  const lamps = [];
+  for (const r of map.rooms) {
+    lamps.push({ x: r.cx, y: r.cy, p: 1.45, sala: r });
+    if (r.w >= 5 || r.h >= 5) {
+      lamps.push({
+        x: r.x + (rnd() < 0.5 ? 0 : r.w - 1),
+        y: r.y + (rnd() < 0.5 ? 0 : r.h - 1),
+        p: 0.7, sala: r,
+      });
+    }
+  }
+  for (let y = 1; y < map.H - 1; y++) {
+    for (let x = 1; x < map.W - 1; x++) {
+      const i = y * map.W + x;
+      if (map.grid[i] === WALL || map.inRoom[i]) continue;
+      if ((x * 5 + y * 11) % 7 !== 0) continue;
+      lamps.push({ x, y, p: 0.5, sala: null });
+    }
+  }
+  return lamps;
+}
+
+/** Recuo em cada ponta da viga, para a ponta não encostar na face da parede. */
+export const FOLGA_VIGA = 0.09;
+
+/**
+ * Onde as vigas de teto podem correr.
+ *
+ * Cada viga cobre um TRECHO CORRIDO de células livres, não uma célula solta.
+ * Antes era uma peça por célula, larga exatamente como a célula, e isso dava
+ * dois defeitos ao mesmo tempo. O primeiro é geométrico: a ponta da viga
+ * encostava rente na face da parede vizinha, duas superfícies no mesmo plano
+ * disputando profundidade — o cintilar que parece erro de textura, com a viga
+ * metade dentro e metade fora do muro. O segundo é de composição: célula
+ * isolada vira tábua flutuando no ar, sem apoio à vista.
+ *
+ * Livre quer dizer livre de tudo o que já ocupa a faixa logo abaixo do teto.
+ * Parede é óbvia; as outras três não são, e cada uma produzia o mesmo defeito:
+ *
+ *   · porta      — o umbral tem uma travessa no topo, na mesma altura da viga.
+ *                  Na obra também é assim: a viga morre no vão e o lintel
+ *                  assume.
+ *   · pilar      — vai do chão ao teto, atravessa a viga inteira.
+ *   · luminária  — pendurada logo abaixo do teto, na mesma faixa.
+ *
+ * Está aqui fora, e não dentro da classe, para o teste conferir a mesma conta
+ * que o jogo usa em vez de uma cópia dela.
+ *
+ * @param {object} map
+ * @param {{x:number,y:number}[]} lamps
+ * @returns {{y:number, inicio:number, fim:number}[]}
+ */
+export function planejarVigas(map, lamps) {
+  const luminaria = new Set(lamps.map(L => L.y * map.W + L.x));
+  const livre = (x, y) => {
+    const c = cellAt(map, x, y);
+    if (c === WALL || c === DOOR) return false;
+    const i = y * map.W + x;
+    if (map.opacos?.has(i)) return false;        // pilar: do chão ao teto
+    if (luminaria.has(i)) return false;
+    return true;
+  };
+
+  const vigas = [];
+  for (let y = 1; y < map.H - 1; y++) {
+    if (y % 3 !== 1) continue;                   // uma fileira a cada três
+    let inicio = -1;
+    for (let x = 0; x <= map.W; x++) {
+      const aberta = x < map.W && livre(x, y);
+      if (aberta && inicio < 0) inicio = x;
+      if (!aberta && inicio >= 0) {
+        // trecho de uma célula só não vira viga: seria a tábua solta de novo
+        if (x - 1 > inicio) vigas.push({ y, inicio, fim: x - 1 });
+        inicio = -1;
+      }
+    }
+  }
+  return vigas;
+}
+
 export class World {
   constructor(map, scene) {
     this.map = map;
@@ -53,33 +146,11 @@ export class World {
 
   // ------------------------------------------------------------ iluminação
   _buildLamps() {
-    const { map } = this;
-    const rnd = mulberry32(map.seed ^ 0x1a3b);
-    const lamps = [];
-    for (const r of map.rooms) {
-      const cor = new THREE.Color(r.tema.luz);
-      lamps.push({ x: r.cx, y: r.cy, p: 1.45, cor });
-      if (r.w >= 5 || r.h >= 5) {
-        lamps.push({
-          x: r.x + (rnd() < 0.5 ? 0 : r.w - 1),
-          y: r.y + (rnd() < 0.5 ? 0 : r.h - 1),
-          p: 0.7, cor,
-        });
-      }
-    }
-    // Corredor é penumbra: luminária esparsa e fraca. Essa diferença entre
-    // sala clara e corredor escuro é de gameplay, não só de enfeite — é onde
-    // o fugitivo some e onde o caçador precisa chegar perto para ter certeza.
-    const corridor = new THREE.Color(EDG.steel);
-    for (let y = 1; y < map.H - 1; y++) {
-      for (let x = 1; x < map.W - 1; x++) {
-        const i = y * map.W + x;
-        if (map.grid[i] === WALL || map.inRoom[i]) continue;
-        if ((x * 5 + y * 11) % 7 !== 0) continue;
-        lamps.push({ x, y, p: 0.5, cor: corridor });
-      }
-    }
-    this.lamps = lamps;
+    const corredor = new THREE.Color(EDG.steel);
+    this.lamps = planejarLuminarias(this.map).map(L => ({
+      ...L,
+      cor: L.sala ? new THREE.Color(L.sala.tema.luz) : corredor,
+    }));
   }
 
   /**
@@ -208,15 +279,34 @@ export class World {
     this.ceil.instanceMatrix.needsUpdate = true;
     this.root.add(this.ceil);
 
-    // vigas atravessando o teto: profundidade e ritmo ao olhar para cima
-    const beamCells = floorCells.filter(([x, y]) => (x + y * 2) % 4 === 0);
-    if (beamCells.length) {
+    /*
+     * Vigas atravessando o teto: profundidade e ritmo ao olhar para cima.
+     *
+     * Cada viga cobre um TRECHO CORRIDO de células abertas, não uma célula
+     * solta. Antes era uma peça por célula, larga exatamente como a célula, e
+     * isso dava dois defeitos ao mesmo tempo. O primeiro é geométrico: a ponta
+     * da viga encostava rente na face da parede vizinha, duas superfícies no
+     * mesmo plano disputando profundidade — o cintilar que parece erro de
+     * textura, com a viga metade dentro e metade fora do muro. O segundo é de
+     * composição: célula isolada vira tábua flutuando no ar, sem apoio à vista.
+     *
+     * Correndo o trecho inteiro e recuando as pontas, a viga nasce e morre no
+     * ar aberto, sem encostar em nada, e passa a parecer o que é: uma travessa
+     * apoiada de parede a parede.
+     */
+    const vigas = planejarVigas(map, this.lamps);
+
+    if (vigas.length) {
       this.beams = new THREE.InstancedMesh(
-        shadeBox(new THREE.BoxGeometry(C, 0.28, 0.42), 0.28), flat({ vertexColors: true }), beamCells.length);
-      beamCells.forEach(([x, y], i) => {
-        m.makeTranslation(x * C, CFG.WALL_H - 0.15, y * C);
+        shadeBox(new THREE.BoxGeometry(1, 0.28, 0.42), 0.28),
+        flat({ vertexColors: true }), vigas.length);
+      vigas.forEach((v, i) => {
+        const comprimento = (v.fim - v.inicio + 1) * C - FOLGA_VIGA * 2;
+        const centro = ((v.inicio + v.fim) / 2) * C;
+        m.makeScale(comprimento, 1, 1);
+        m.setPosition(centro, CFG.WALL_H - 0.15, v.y * C);
         this.beams.setMatrixAt(i, m);
-        this.beams.setColorAt(i, paint(x, y, EDG.bark, 1.25));
+        this.beams.setColorAt(i, paint(v.inicio, v.y, EDG.bark, 1.25));
       });
       this.beams.instanceMatrix.needsUpdate = true;
       this.root.add(this.beams);

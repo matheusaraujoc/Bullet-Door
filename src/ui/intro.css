@@ -96,7 +96,12 @@
 }
 
 /*
- * Brilho metálico atravessando a marca.
+ * Brilho metálico atravessando a marca — só na versão TIPOGRÁFICA.
+ *
+ * Quando existe o arquivo do logo, quem passa a lâmina é o canvas em
+ * Intro.js: mistura de camada e máscara por URL falham em silêncio em parte
+ * das máquinas, e o efeito simplesmente não acontecia no ar. Sobre texto, que
+ * não tem camada promovida nem máscara, isto aqui continua servindo.
  *
  * Some o `overlay` daqui: aquele modo escurece o que já é escuro, e a marca é
  * laranja sobre preto — o branco do brilho entrava e simplesmente sumia. Com
@@ -117,12 +122,6 @@
   background-position: 130% 0%;
   mix-blend-mode: screen;
   opacity: 0;
-}
-#intro .sweep.mascara {
-  -webkit-mask-image: var(--logo-mask); mask-image: var(--logo-mask);
-  -webkit-mask-size: contain; mask-size: contain;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-  -webkit-mask-position: center; mask-position: center;
 }
 #intro .sweep.brilhar { animation: introSweep 1.25s cubic-bezier(.4,0,.5,1) forwards; }
 @keyframes introSweep {
@@ -156,10 +155,22 @@
 }
 @keyframes introPisca { 50% { opacity: .35; } }
 
+/*
+ * O aviso de pular é o ÚNICO alvo de clique da abertura.
+ *
+ * Ele nasce invisível e sem receber clique; só quando a marca aparece é que
+ * ganha a classe `armado`. E tem área generosa em volta do texto, porque num
+ * celular um alvo de onze pixels de altura não se acerta.
+ */
 #intro .pular {
-  position: absolute; right: 26px; bottom: 22px; z-index: 4;
+  position: absolute; right: 14px; bottom: 10px; z-index: 5;
+  padding: 14px 18px; margin: 0;
   font-size: 11px; letter-spacing: .3em; color: rgba(245,243,238,.3);
+  opacity: 0; pointer-events: none; cursor: pointer;
+  transition: opacity .4s ease, color .15s ease;
 }
+#intro .pular.armado { opacity: 1; pointer-events: auto; }
+#intro .pular.armado:hover { color: rgba(245,243,238,.75); }
 
 @media (prefers-reduced-motion: reduce) {
   #intro .shard, #intro .grid-bg, #intro .logo, #intro .logo-texto, #intro .flash { animation: none !important; }

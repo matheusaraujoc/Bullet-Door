@@ -181,8 +181,20 @@ function estrelaGeometry(pontas, sorteio) {
  */
 export function makeFlash(escala = 1) {
   const grupo = new THREE.Group();
+  /*
+   * O clarão RESPEITA profundidade.
+   *
+   * Estava com `depthTest: false`, e por isso desenhava por cima de tudo —
+   * inclusive das partes da arma que estão na frente dele. Na tela isso lê como
+   * um clarão saindo por trás da arma e vazando por cima do cano, em vez de
+   * sair da boca. Com o teste ligado, a arma esconde o que passa atrás dela e o
+   * clarão fica onde deve: à frente do cano.
+   *
+   * `depthWrite` continua desligado: é geometria transparente, e escrever
+   * profundidade faria uma ponta da estrela recortar a outra.
+   */
   const mat = cor => new THREE.MeshBasicMaterial({
-    color: cor, transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+    color: cor, transparent: true, opacity: 0, depthWrite: false, depthTest: true,
     blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
 
@@ -216,6 +228,12 @@ export function makeFlash(escala = 1) {
       halo.rotation.z = Math.random() * Math.PI * 2;
       nucleo.rotation.z = Math.random() * Math.PI * 2;
     },
+    /** Corta o clarão na hora, sem esperar a queda. */
+    apagar() {
+      grupo.visible = false;
+      for (const h of halos) h.material.opacity = 0;
+      nucleo.material.opacity = 0;
+    },
     /** Some depressa: clarão que demora vira lanterna. */
     update(dt) {
       if (!grupo.visible) return;
@@ -229,6 +247,42 @@ export function makeFlash(escala = 1) {
 }
 
 /**
+ * O centro da face dianteira da arma: a boca do cano.
+ *
+ * Percorre os vértices e fica com os que estão colados no menor Z — a arma em
+ * primeira pessoa aponta para -Z, então essa é a face da frente. A média de x e
+ * y desses vértices é o centro do furo. Perguntar à geometria custa uma
+ * passada, uma vez na vida, e dispensa qualquer número mágico.
+ */
+function bocaDoCano(objeto) {
+  objeto.updateMatrixWorld(true);
+  const v = new THREE.Vector3();
+  let menorZ = Infinity;
+  const malhas = [];
+  objeto.traverse(o => { if (o.isMesh && o.geometry?.attributes?.position) malhas.push(o); });
+
+  for (const m of malhas) {
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (v.z < menorZ) menorZ = v.z;
+    }
+  }
+
+  // "colado na face" com folga: modelo voxel tem a ponta chanfrada
+  const folga = 0.012;
+  let sx = 0, sy = 0, n = 0;
+  for (const m of malhas) {
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (v.z <= menorZ + folga) { sx += v.x; sy += v.y; n++; }
+    }
+  }
+  return n ? new THREE.Vector3(sx / n, sy / n, menorZ) : new THREE.Vector3(0, 0, 0);
+}
+
+/**
  * A arma em primeira pessoa. Fica pendurada na câmera com um pouco de atraso
  * no balanço — arma grudada rígida na tela é o que faz o tiro parecer morto.
  */
@@ -239,13 +293,32 @@ export class ViewModel {
     this.gun.scale.setScalar(assets.charScale * 0.46);
     this.group.add(this.gun);
 
-    // clarão na boca do cano
-    const len = assets.pistol.size.x * assets.charScale * 0.46;
-    this.flash = makeFlash(0.19);
-    this.flash.grupo.position.set(0, 0.15, -len * 1.25);
+    /*
+     * O clarão sai da BOCA DO CANO, achada na geometria.
+     *
+     * Já foi uma conta em cima do comprimento do modelo, e depois um palpite em
+     * cima da caixa envolvente. Os dois erram pelo mesmo motivo: a caixa inclui
+     * o cabo descendo e a alça de mira subindo, então "78% da altura" não é o
+     * eixo do cano, é um ponto qualquer perto do topo.
+     *
+     * O jeito que não erra é perguntar à peça. Os vértices que ficam na face da
+     * frente SÃO a boca; a média deles dá o centro exato do furo, em qualquer
+     * modelo e em qualquer escala. E a estrela nasce um raio à frente disso,
+     * para o cano recortar só as pontas de trás — que é o desenho certo de um
+     * clarão saindo do cano, e não de dentro da arma.
+     */
+    const boca = bocaDoCano(this.gun);
+    const raio = assets.pistol.size.y * assets.charScale * 0.46 * 1.6;
+    boca.z -= raio;
+    // um tico abaixo do eixo: a média dos vértices da face cai no meio do bloco
+    // do cano, e o furo de um cano fica logo abaixo do topo dele
+    boca.y -= raio * 0.3;
+
+    this.flash = makeFlash(raio);
+    this.flash.grupo.position.copy(boca);
     this.group.add(this.flash.grupo);
     this.muzzle = new THREE.Object3D();
-    this.muzzle.position.copy(this.flash.grupo.position);
+    this.muzzle.position.copy(boca);
     this.group.add(this.muzzle);
 
     this.base = new THREE.Vector3(0.3, -0.52, -0.5);

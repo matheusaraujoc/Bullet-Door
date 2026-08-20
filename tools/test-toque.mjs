@@ -49,13 +49,19 @@ check(respondeu, 'o toque no convite não deu resposta imediata');
 await p.waitForFunction(() => !!document.querySelector('#intro .logo, #intro .logo-texto'),
   { timeout: 20000 }).catch(() => {});
 const logo = await p.evaluate(async () => {
-  const img = document.querySelector('#intro .logo');
-  if (!img) return { usouImagem: false };
-  await img.decode().catch(() => {});
-  return { usouImagem: true, largura: img.naturalWidth, altura: img.naturalHeight };
+  // com a imagem no lugar, a marca é um CANVAS: é nele que a lâmina de luz é
+  // desenhada, sem depender de mistura de camada nem de máscara
+  const cv = document.querySelector('#intro .marca canvas.logo');
+  if (!cv) return { usouImagem: false };
+  // e tem que ter pixel de verdade dentro, não só as medidas certas
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  let opacos = 0;
+  for (let i = 3; i < d.length; i += 4 * 97) if (d[i] > 24) opacos++;
+  return { usouImagem: true, largura: cv.width, altura: cv.height, opacos };
 });
 console.log('logo da abertura:', JSON.stringify(logo));
 check(logo.usouImagem, 'a abertura caiu na marca de reserva — a imagem do logo não chegou');
+check((logo.opacos ?? 0) > 20, 'o canvas da marca está em branco: o logo não foi desenhado nele');
 check(logo.largura > 0, 'a imagem do logo não decodificou');
 
 await p.waitForFunction(() => !document.getElementById('intro'), { timeout: 40000 }).catch(() => {});

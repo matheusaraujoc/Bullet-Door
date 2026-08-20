@@ -9,6 +9,7 @@ export class HUD {
       hud: $('hud'), timer: $('timer'), role: $('role'), objective: $('objective'),
       phasebar: $('phasebar').firstElementChild,
       scoreYou: $('scoreYou'), scoreBot: $('scoreBot'), roundLabel: $('roundLabel'),
+      pendYou: $('pendYou'), pendBot: $('pendBot'),
       prompt: $('prompt'), weapon: $('weapon'), cooldown: $('cooldown'),
       stamina: $('stamina'), staminaBar: $('stamina').firstElementChild,
       killfeed: $('killfeed'), flash: $('flash'), noisering: $('noisering'),
@@ -72,18 +73,42 @@ export class HUD {
    * únicos que aparecem. O rótulo embaixo diz o que eles são e quanto falta —
    * sem ele o jogador vê "1 — 0" e não sabe se aquilo é rodada, ponto ou vida.
    */
-  setScore(you, bot, roundNum, deQuantas = 3) {
-    this.el.scoreYou.textContent = you;
-    this.el.scoreBot.textContent = bot;
+  /**
+   * @param {number} you  eliminações suas, incluindo as da rodada em curso
+   * @param {number} bot  idem, do inimigo
+   * @param {number} roundNum
+   * @param {number} [deQuantas]
+   * @param {number} [pendSeu] quantas das suas foram NESTA rodada, ainda aberta
+   * @param {number} [pendBot] idem
+   */
+  setScore(you, bot, roundNum, deQuantas = 3, pendSeu = 0, pendBot = 0) {
+    /*
+     * O número grande conta só rodada FECHADA; o que aconteceu na rodada em
+     * curso aparece ao lado, como "+1".
+     *
+     * O placar somava a eliminação no instante do tiro, e aí ele passava a
+     * dizer "2" embaixo de um rótulo que promete "2 levam a partida" — com a
+     * rodada ainda aberta e podendo virar 2 a 2. O número estava certo sobre
+     * eliminações e errado sobre o que ele parecia anunciar.
+     *
+     * Separar os dois resolve sem tirar a resposta imediata: o "+1" aparece no
+     * mesmo instante do tiro, e o número que decide a partida só se mexe quando
+     * a rodada de fato fecha.
+     */
+    this.el.scoreYou.textContent = you - pendSeu;
+    this.el.scoreBot.textContent = bot - pendBot;
+    this.el.pendYou.textContent = pendSeu > 0 ? `+${pendSeu}` : '';
+    this.el.pendBot.textContent = pendBot > 0 ? `+${pendBot}` : '';
     // passado o melhor de 3, a partida só continua porque empatou: dizer
     // "RODADA 4 DE 3" seria mentira, e "DESEMPATE" já explica por que ainda
     // se está jogando
     this.el.roundLabel.textContent = roundNum > deQuantas
       ? t('hud.desempate', { n: roundNum })
       : t('hud.rodadaDe', { n: roundNum, total: deQuantas });
-    // quem já chegou ao alvo aparece aceso, mesmo antes do fim da rodada
-    this.el.scoreYou.classList.toggle('lidera', you > bot);
-    this.el.scoreBot.classList.toggle('lidera', bot > you);
+    // quem está na frente acende — pelo confirmado, não pelo que ainda pende
+    const fSeu = you - pendSeu, fBot = bot - pendBot;
+    this.el.scoreYou.classList.toggle('lidera', fSeu > fBot);
+    this.el.scoreBot.classList.toggle('lidera', fBot > fSeu);
   }
 
   big(sub, main, cls = '') {

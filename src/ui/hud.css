@@ -116,7 +116,11 @@ body.runner #crosshair { opacity: 0; }
 body.mirando #crosshair { opacity: 0; }
 
 /* ---- topo: papel, relógio e a régua da fase, num painel só ---- */
-#top { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; }
+#top {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  max-width: 92vw;
+}
 #top .painel { padding: 9px 32px 0; min-width: 280px; overflow: hidden; }
 
 #role {
@@ -164,6 +168,21 @@ body.runner #phasebar { color: var(--runner); }
   color: var(--marfim); line-height: 1;
 }
 .s-x { color: rgba(150, 168, 196, .5); font-size: 17px; margin: 0 2px; }
+
+/*
+ * O ponto da rodada em curso, ainda não somado ao placar.
+ *
+ * Fica pequeno e ao lado do número, não dentro dele: é informação de "acabou
+ * de acontecer", e o número grande é o que decide a partida. Pulsa devagar
+ * para dizer que ainda está em jogo.
+ */
+.s-pend {
+  font-style: normal; font-size: 14px; font-weight: 700;
+  color: var(--laranja-lt); margin: 0 1px; align-self: flex-start;
+  animation: pendendo 1.4s ease-in-out infinite;
+}
+.s-pend:empty { display: none; }
+@keyframes pendendo { 50% { opacity: .45; } }
 
 /*
  * O rótulo do placar.
@@ -240,7 +259,16 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
 #stamina.low i { background: linear-gradient(90deg, var(--hunter), #ffa8ad); }
 
 /* ---- avisos passageiros ---- */
-#killfeed { position: absolute; left: 50%; top: 168px; transform: translateX(-50%); text-align: center; }
+/*
+ * Os avisos passageiros entram na MESMA coluna do topo, logo abaixo do
+ * objetivo, e empurram para baixo em vez de flutuar.
+ *
+ * Antes o killfeed era ancorado num "top: 168px" contado à mão, e bastava a
+ * tipografia crescer um ponto para "PASSOU PERTO" encostar em "SOBREVIVA —
+ * NEGUE O PONTO". Medida fixa para acompanhar um bloco que muda de altura é
+ * conta que sempre acaba errada; no fluxo, o navegador faz a conta sozinho.
+ */
+#killfeed { margin-top: 8px; text-align: center; }
 #killfeed div {
   font-size: 15px; font-weight: 700; letter-spacing: .07em; margin-bottom: 7px; padding: 8px 20px;
   background: var(--painel); border: 2px solid var(--acento-br); border-radius: 999px;

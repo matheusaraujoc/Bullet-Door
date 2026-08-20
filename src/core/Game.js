@@ -103,6 +103,22 @@ export class Game {
     this.clock = new THREE.Clock();
     this.raycastTargets = [];
 
+    /*
+     * O corpo do jogador, invisível, para o tiro do inimigo ter no que bater.
+     *
+     * Em primeira pessoa o jogador não tem malha nenhuma na cena, e por isso o
+     * disparo do bot era resolvido só por ângulo: se a mira caísse dentro da
+     * largura angular do alvo, era acerto — parede no meio ou não. Daí os tiros
+     * atravessando muro e porta. Com um corpo de verdade aqui, os dois lados
+     * passam a usar exatamente o mesmo raycast contra exatamente a mesma
+     * geometria, e o que estiver na frente é o que leva o tiro.
+     */
+    this.playerHitbox = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 1.75, 0.7),
+      new THREE.MeshBasicMaterial({ visible: false }));
+    this.playerHitbox.userData.jogador = true;
+    this.scene.add(this.playerHitbox);
+
     this._buildEffects();
 
     this.input.onInteract = () => this.tryDoor();
@@ -255,6 +271,8 @@ export class Game {
 
   // ---------------------------------------------------------------- setup
   async load(onProgress) {
+    // o tiro vem gravado, embutido no código: nada de rede envolvida
+    this.audio.carregarGravados();
     await this.assets.load(onProgress);
     this.player.attachViewModel(this.assets, this.vmCamera);
     this.ready = true;
@@ -331,7 +349,8 @@ export class Game {
     this.audio.aoMudar?.();                       // os botões do canto têm title
     if (this.running) {
       this.hud.setRole(this.player.role, this._objetivo(this.player.role));
-      this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round);
+      this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round,
+                      CFG.RODADAS_PADRAO, this.rounds.pontoSeu, this.rounds.pontoBot);
     }
   }
 
@@ -398,7 +417,8 @@ export class Game {
     if (!this.bot) this.bot = new Bot(this.assets, this.scene, this.world, this.audio, this, seed);
     else this.bot.world = this.world;
 
-    this.raycastTargets = [...this.world.solidMeshes, this.world.doors.leaves, this.bot.hitbox];
+    this.raycastTargets = [...this.world.solidMeshes, this.world.doors.leaves,
+                           this.bot.hitbox, this.playerHitbox];
   }
 
   /** Põe os dois no mapa, longe um do outro, e devolve as portas ao estado inicial. */
@@ -446,7 +466,8 @@ export class Game {
   // --------------------------------------------------------------- eventos
   onHalfPrepared(role, half, comIntro) {
     this.hud.setRole(role, this._objetivo(role));
-    this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round);
+    this.hud.setScore(this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.round,
+                      CFG.RODADAS_PADRAO, this.rounds.pontoSeu, this.rounds.pontoBot);
     this.hud.setTimer(CFG.PHASE_TIME);
     this.hud.setPhase(1);
     if (comIntro) {
@@ -469,6 +490,10 @@ export class Game {
    */
   onHalfEnded(role, abateu) {
     this.player.vel.set(0, 0, 0);
+    // nada de resíduo de disparo entrando na tela de resultado
+    this.player.vm?.flash.apagar();
+    this.muzzleLight.intensity = 0;
+    this.vmMuzzleLight.intensity = 0;
     if (!abateu) return;
     // O número grande é o ponto, não o cronômetro. Mostrar "8.4s" aqui era o
     // que fazia a velocidade parecer valer alguma coisa — e não vale: o que
@@ -492,15 +517,25 @@ export class Game {
    * sobreviveram, não que nada aconteceu.
    */
   onRoundEnded(seuPonto, pontoBot, placarSeu, placarBot) {
-    const sub = t(seuPonto && pontoBot ? 'jogo.osDois'
-      : seuPonto ? 'jogo.vocePontuou'
-      : pontoBot ? 'jogo.elePontuou'
-      : 'jogo.ninguem');
+    /*
+     * A frase descreve a RODADA INTEIRA, pelas duas coisas que aconteceram com
+     * quem joga: acertou na caçada, e escapou na fuga.
+     *
+     * Antes as quatro saídas eram "ELIMINARAM OS DOIS", "VOCÊ ELIMINOU", "O
+     * INIMIGO ELIMINOU" e "NINGUÉM ELIMINOU" — todas escritas do ponto de vista
+     * do placar, não do jogador. "Eliminaram os dois" nem português direito é:
+     * lê como se duas pessoas tivessem sido eliminadas, quando o que houve foi
+     * um ponto para cada lado. Agora cada frase conta o que a pessoa fez.
+     */
+    const sub = t(seuPonto
+      ? (pontoBot ? 'jogo.rodadaTrocada' : 'jogo.rodadaLimpa')
+      : (pontoBot ? 'jogo.rodadaPerdida' : 'jogo.rodadaVazia'));
     const cor = seuPonto && !pontoBot ? 'runner' : pontoBot && !seuPonto ? 'hunter' : '';
     if (seuPonto && !pontoBot) this.audio.play('win');
     else if (pontoBot && !seuPonto) this.audio.play('lose');
     this.hud.big(sub, t('jogo.placar', { seu: placarSeu, dele: placarBot }), cor);
-    this.hud.setScore(placarSeu, placarBot, this.rounds.round);
+    // a rodada fechou: o que estava pendente vira número
+    this.hud.setScore(placarSeu, placarBot, this.rounds.round, CFG.RODADAS_PADRAO);
   }
 
   onMatchEnded(vencedor) {
@@ -555,6 +590,69 @@ export class Game {
   }
 
   // ----------------------------------------------------------------- tiros
+  /**
+   * Para onde a bala vai parar.
+   *
+   * Um caminho só, usado pelo jogador e pelo inimigo, contra a mesma lista de
+   * alvos: parede, caixote, pilar, folha de porta e os dois corpos. Quem
+   * estiver mais perto ao longo da reta é quem leva — que é a única definição
+   * de "trajetória" que não deixa bala passar por dentro de porta fechada.
+   *
+   * @param {THREE.Vector3} origem  boca do cano
+   * @param {THREE.Vector3} direcao já normalizada
+   * @param {THREE.Object3D} [ignorar] o corpo de quem atirou
+   */
+  tracarTiro(origem, direcao, ignorar = null) {
+    this._raio ??= new THREE.Raycaster();
+    this._raio.set(origem, direcao);
+    this._raio.far = CFG.RANGE;
+    const alvos = ignorar
+      ? this.raycastTargets.filter(o => o !== ignorar)
+      : this.raycastTargets;
+    const acertos = this._raio.intersectObjects(alvos, false);
+    if (!acertos.length) {
+      return { ponto: origem.clone().addScaledVector(direcao, CFG.RANGE), objeto: null };
+    }
+    return { ponto: acertos[0].point, objeto: acertos[0].object };
+  }
+
+  /**
+   * O disparo do inimigo, resolvido pela trajetória e não pelo ângulo.
+   *
+   * A pontaria continua errando de propósito (o primeiro tiro de cada contato
+   * sai torto), mas o erro agora desloca a DIREÇÃO do disparo, e a bala segue
+   * essa direção até bater em alguma coisa. Se essa coisa for uma parede, foi
+   * na parede que ela bateu — não importa que o jogador estivesse alinhado
+   * atrás dela.
+   */
+  resolverTiroDoBot(bot, alvo, origem, direcao) {
+    // o corpo é posto no lugar aqui, e não só uma vez por quadro: a bala não
+    // pode depender de o laço de desenho ter rodado antes do disparo
+    this._sincronizarCorpoDoJogador();
+    const { ponto, objeto } = this.tracarTiro(origem, direcao, bot.hitbox);
+    this.spawnTracer(origem, ponto);
+
+    if (objeto === this.playerHitbox) {
+      this.spawnImpact(ponto, EDG.red);
+      this.onBotHitPlayer(bot, alvo);
+      return;
+    }
+    // bateu no cenário, ou não bateu em nada: o jogador ouve passar perto
+    if (objeto) {
+      this.spawnImpact(ponto, EDG.sand);
+      this.audio.playAt('bump', ponto, this.player.pos, this.player.yaw, 30, 0.5);
+    }
+    this.onBotMissed(bot, alvo, ponto);
+  }
+
+  /** Põe o corpo invisível do jogador onde o jogador está. */
+  _sincronizarCorpoDoJogador() {
+    const altura = this.player.crouching ? CFG.CROUCH_H * 0.55 : 0.9;
+    this.playerHitbox.position.set(this.player.pos.x, altura, this.player.pos.z);
+    this.playerHitbox.scale.y = this.player.crouching ? 0.62 : 1;
+    this.playerHitbox.updateMatrixWorld();
+  }
+
   onPlayerShoot() {
     this.muzzleLight.intensity = 3.2;
     this.vmMuzzleLight.intensity = 2.6;
@@ -582,7 +680,9 @@ export class Game {
   killBot() {
     this.bot.die();
     this.audio.play('hit', { vol: 0.9 });
-    this.hud.feed(t('hud.alvoAbatido'));
+    // sem aviso no canto: o abate fecha a metade na mesma hora, e a mensagem
+    // grande no meio da tela já diz "ALVO ELIMINADO". Os dois juntos eram a
+    // mesma frase duas vezes, em dois lugares, no mesmo segundo.
     this.rounds.registerKill();
   }
 
@@ -594,9 +694,28 @@ export class Game {
     this.rounds.registerKill();
   }
 
-  onBotMissed(bot) {
-    this.hud.feed(t('hud.passouPerto'));
-    this.audio.playAt('bump', bot.pos, this.player.pos, this.player.yaw, 22, 0.5);
+  /**
+   * Errou. O aviso na tela só sai quando a bala passou perto de verdade —
+   * antes ele saía em todo tiro errado, inclusive nos que morreram numa parede
+   * a vinte metros, e virava alarme falso constante.
+   */
+  onBotMissed(bot, alvo, ponto = null) {
+    const perto = !ponto || this._distanciaDaBala(bot, ponto) < 2.2;
+    if (perto) {
+      this.hud.feed(t('hud.passouPerto'));
+      this.audio.playAt('bump', bot.pos, this.player.pos, this.player.yaw, 22, 0.5);
+    }
+  }
+
+  /** A que distância do jogador a bala passou, no seu trecho mais próximo. */
+  _distanciaDaBala(bot, ponto) {
+    const o = bot.actor.muzzleWorld(new THREE.Vector3());
+    const d = ponto.clone().sub(o);
+    const comprimento = d.length() || 1;
+    d.divideScalar(comprimento);
+    const ao = this.player.pos.clone().setY(0.9).sub(o);
+    const t = Math.max(0, Math.min(comprimento, ao.dot(d)));
+    return o.addScaledVector(d, t).sub(this.player.pos.clone().setY(0.9)).length();
   }
 
   // ------------------------------------------------------------------ loop
@@ -614,11 +733,22 @@ export class Game {
         this.player.update(dt);
       } else {
         this.input.takeShoot();                  // descarta cliques fora da fase
+        /*
+         * Fora da fase o jogador anda com o tempo quase parado, para a cena
+         * congelar. Só que o clarão da boca do cano queimava nesse mesmo tempo
+         * — e como ele apaga por dt, um dt de quase zero o deixava aceso para
+         * sempre. Era isso que deixava a estrela do disparo plantada na tela
+         * por cima da arma quando a rodada acabava justo no tiro que matou.
+         * O clarão é efeito de tela, não física do jogador: queima no relógio
+         * de verdade.
+         */
         this.player.update(dt * 0.0001);
+        this.player.vm?.flash.update(dt);
       }
       if (this.bot && vivo) this.bot.update(dt, this.player);
       else if (this.bot) this.bot.actor.update(dt, 0, this.bot.yaw);
 
+      this._sincronizarCorpoDoJogador();
       this.world?.doors.update(dt, this.ocupantes());
       this._updateEffects(dt);
       this._updateHud(dt, vivo);

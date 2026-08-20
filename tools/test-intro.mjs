@@ -39,7 +39,22 @@ for (let i = 0; i < 90; i++) {
     return {
       fim: false,
       logo: el.querySelector('.logo-stage')?.classList.contains('show') || false,
-      sweep: el.querySelector('.sweep')?.classList.contains('brilhar') || false,
+      /*
+       * A lâmina de luz é desenhada no canvas da marca, não por classe no DOM.
+       * Aqui basta saber que ela ACONTECEU, e o sinal disso é o canvas ter mais
+       * pixel claro do que o logo parado tem — a faixa branca atravessando.
+       */
+      sweep: (() => {
+        const cv = el.querySelector('.marca canvas.logo');
+        if (!cv) return el.querySelector('.sweep')?.classList.contains('brilhar') || false;
+        const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        let claros = 0;
+        for (let k = 0; k < d.length; k += 4 * 53) {
+          if (d[k + 3] > 40 && d[k] > 235 && d[k + 1] > 225 && d[k + 2] > 205) claros++;
+        }
+        // o logo em repouso é laranja; branco quase puro só existe sob a lâmina
+        return claros > 12;
+      })(),
     };
   });
   if (st.fim) break;

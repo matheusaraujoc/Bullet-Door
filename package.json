@@ -28,10 +28,13 @@
     "test:placar": "node tools/test-placar.mjs",
     "test:teclado": "node tools/test-teclado.mjs",
     "test:menu": "node tools/test-menu.mjs",
-    "musica": "node tools/otimizar-musica.mjs",
     "test:audio": "node tools/test-audio.mjs",
     "test:idioma": "node tools/test-idioma.mjs",
-    "test:arma": "node tools/test-arma.mjs"
+    "test:arma": "node tools/test-arma.mjs",
+    "test:balistica": "node tools/test-balistica.mjs",
+    "test:geometria": "node tools/test-geometria.mjs",
+    "test:som": "node tools/test-som.mjs",
+    "audio": "node tools/otimizar-audio.mjs"
   },
   "devDependencies": {
     "lamejs": "^1.2.1",

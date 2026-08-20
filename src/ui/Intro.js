@@ -33,6 +33,66 @@ function temLogo() {
 }
 
 /**
+ * Troca a marca por um canvas com o logo desenhado, e devolve a função que
+ * passa a lâmina de luz por cima dele.
+ *
+ * A faixa é um gradiente diagonal que atravessa a peça em pouco mais de um
+ * segundo. `source-atop` é a peça-chave: ela recorta a faixa na silhueta do
+ * logo sem máscara nenhuma, porque só pinta onde já existe pixel opaco.
+ */
+async function prepararMarca(marca) {
+  const img = await new Promise(ok => {
+    const i = new Image();
+    i.onload = () => ok(i);
+    i.onerror = () => ok(null);
+    i.src = LOGO;
+  });
+  if (!img) return null;
+
+  const cv = document.createElement('canvas');
+  cv.className = 'logo';
+  // um teto de resolução: o arquivo é grande e a marca aparece com 460px
+  const escala = Math.min(1, 1024 / img.naturalWidth);
+  cv.width = Math.round(img.naturalWidth * escala);
+  cv.height = Math.round(img.naturalHeight * escala);
+  const ctx = cv.getContext('2d');
+  const desenharLogo = () => {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  };
+  desenharLogo();
+  marca.replaceChildren(cv);
+
+  return function passarLamina(duracao = 1250) {
+    const t0 = performance.now();
+    const larguraFaixa = cv.width * 0.42;
+    const passo = agora => {
+      const k = Math.min(1, (agora - t0) / duracao);
+      desenharLogo();
+      if (k < 1) {
+        // a faixa entra pela direita e sai pela esquerda, inclinada
+        const centro = cv.width * 1.3 - k * (cv.width * 2.6);
+        const g = ctx.createLinearGradient(
+          centro - larguraFaixa, cv.height, centro + larguraFaixa, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0)');
+        g.addColorStop(0.42, 'rgba(255,240,214,.55)');
+        g.addColorStop(0.5, 'rgba(255,255,255,.95)');
+        g.addColorStop(0.58, 'rgba(255,240,214,.55)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        // só pinta onde o logo tem pixel: a silhueta faz o papel da máscara
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.globalCompositeOperation = 'source-over';
+        requestAnimationFrame(passo);
+      }
+    };
+    requestAnimationFrame(passo);
+  };
+}
+
+/**
  * Abertura do estúdio.
  *
  * Roda uma vez e sai — o arquivo original ficava em laço infinito, o que fazia
@@ -112,24 +172,56 @@ export async function tocarIntro({ pulavel = true, carga = null } = {}) {
 
   // agora sim: usa o que já chegou, e o resto entra em cima da hora
   const [comLogo, somMarca, somMetal] = await prontos;
-  if (comLogo) {
-    marca.innerHTML = `<img class="logo" src="${LOGO}" alt="Kountera Games">`;
-    sweep.classList.add('mascara');
-    sweep.style.setProperty('--logo-mask', `url('${LOGO}')`);
-  } else {
+
+  /*
+   * A lâmina de luz é DESENHADA, não composta pelo navegador.
+   *
+   * A versão anterior era CSS puro: uma faixa em gradiente com
+   * `mix-blend-mode: screen` e `mask-image` apontando para o arquivo do logo.
+   * Funciona na bancada e falhava no ar. Os dois recursos dependem de
+   * composição de camadas, e ali havia tudo para dar errado ao mesmo tempo: a
+   * marca tem `filter` animado (que promove a camada), o brilho tem mistura
+   * (que exige recompor com o fundo) e a máscara é um segundo pedido de rede
+   * que precisa ter chegado antes da animação começar. Qualquer um dos três
+   * falhando em silêncio deixa a faixa invisível, e nada disso aparece como
+   * erro — só como um efeito que não acontece.
+   *
+   * Num canvas não há camada, mistura nem segundo pedido: desenha-se o logo e
+   * depois a faixa em `source-atop`, que por definição só pinta onde o logo
+   * tem pixel. É o mesmo desenho, sem depender de nada que possa não estar
+   * pronto. E como a imagem já foi baixada para o teste de existência, ela
+   * entra aqui de memória.
+   */
+  const brilharNaMarca = comLogo ? await prepararMarca(marca) : null;
+  if (!comLogo) {
     marca.innerHTML = `<div class="logo-texto">KOUNTERA<small>GAMES</small></div>`;
   }
 
+  /*
+   * Pular a abertura precisa ser um gesto DELIBERADO.
+   *
+   * Era um clique em qualquer lugar da tela, armado 60 ms depois de começar — e
+   * isso matava a abertura antes da parte que ela existe para mostrar. Quem
+   * entra por um portal clica na moldura para dar foco, clica de novo porque
+   * nada pareceu acontecer, e o segundo clique caía aqui: o brilho metálico da
+   * marca só acontece por volta de um segundo e meio, e nunca chegava a
+   * aparecer. Foi assim que o efeito "não funcionava no itch.io" — ele
+   * funcionava, e era descartado antes de rodar.
+   *
+   * Agora só pula quem mira no aviso de pular ou aperta uma tecla. Clique solto
+   * na tela não faz mais nada, que é o comportamento certo para uma coisa que
+   * dura quatro segundos e roda uma vez por sessão.
+   */
   let saiuCedo = false;
-  const sair = () => { saiuCedo = true; };
-  if (pulavel) {
+  const sair = ev => { ev?.stopPropagation(); saiuCedo = true; };
+  const armarPular = () => {
+    if (!pulavel) return;
     pular.textContent = noToque ? t('intro.pularToque') : t('intro.pularClique');
-    // cinto e suspensório: só arma o atalho no quadro seguinte
-    setTimeout(() => {
-      el.addEventListener('click', sair);
-      addEventListener('keydown', sair);
-    }, 60);
-  }
+    pular.classList.add('armado');
+    pular.addEventListener('click', sair);
+    pular.addEventListener('pointerdown', sair);
+    addEventListener('keydown', sair);
+  };
 
   const tocar = som => {
     if (!som) return;
@@ -162,6 +254,7 @@ export async function tocarIntro({ pulavel = true, carga = null } = {}) {
 
   // ---- a marca aparece: primeiro som ----
   palco.classList.add('show');
+  armarPular();
   tocar(somMarca);
   setTimeout(() => { campo.innerHTML = ''; }, 900);
 
@@ -169,7 +262,9 @@ export async function tocarIntro({ pulavel = true, carga = null } = {}) {
   if (saiuCedo) return encerrar(el, [somMarca, somMetal], calar);
 
   // ---- o brilho metálico atravessa a marca: segundo som ----
-  sweep.classList.add('brilhar');
+  // com imagem, a lâmina é desenhada no canvas; sem ela, a marca é tipografia
+  // e aí o brilho em CSS por cima do texto ainda serve
+  if (brilharNaMarca) brilharNaMarca(); else sweep.classList.add('brilhar');
   tocar(somMetal);
 
   // segura o tempo do som principal, com teto para não arrastar

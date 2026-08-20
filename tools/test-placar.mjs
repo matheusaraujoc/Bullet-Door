@@ -94,6 +94,62 @@ const desempate = await p.evaluate(() => {
 console.log('4ª rodada :', desempate);
 check(/DESEMPATE/.test(desempate), `a rodada extra saiu como "${desempate}"`);
 
+/*
+ * O placar não pode se adiantar à decisão da rodada.
+ *
+ * O caso relatado: está 1 a 1, você elimina na sua caçada, e o mostrador já vai
+ * para 2 a 1 — com a rodada ainda aberta, podendo terminar 2 a 2. O número
+ * estava certo sobre eliminações e errado sobre o que parecia anunciar, porque
+ * logo abaixo dele está escrito que duas eliminações levam a partida.
+ *
+ * Agora o número grande conta só rodada FECHADA, e o que aconteceu na rodada em
+ * curso aparece ao lado como "+1".
+ */
+{
+  const cena = await p.evaluate(() => {
+    const g = window.game;
+    const ler = () => ({
+      voce: document.getElementById('scoreYou').textContent,
+      pendVoce: document.getElementById('pendYou').textContent,
+      inimigo: document.getElementById('scoreBot').textContent,
+      pendInimigo: document.getElementById('pendBot').textContent,
+    });
+
+    // uma rodada já fechada em 1 a 1
+    g.rounds.scoreYou = 1; g.rounds.scoreBot = 1;
+    g.rounds.pontoSeu = 0; g.rounds.pontoBot = 0;
+    g.rounds.round = 2;
+    g.hud.setScore(1, 1, 2, 3, 0, 0);
+    const antes = ler();
+
+    // e agora você elimina na caçada da rodada 2
+    g.rounds.scoreYou = 2; g.rounds.pontoSeu = 1;
+    g.hud.setScore(g.rounds.scoreYou, g.rounds.scoreBot, g.rounds.round, 3,
+                   g.rounds.pontoSeu, g.rounds.pontoBot);
+    const durante = ler();
+
+    // o inimigo devolve na fuga: a rodada fecha 1 a 1 e o placar vira 2 a 2
+    g.rounds.scoreBot = 2; g.rounds.pontoBot = 1;
+    g.onRoundEnded(1, 1, 2, 2);
+    const fechada = ler();
+    return { antes, durante, fechada };
+  });
+
+  console.log('1 a 1     :', JSON.stringify(cena.antes));
+  console.log('você matou:', JSON.stringify(cena.durante));
+  console.log('rodada fim:', JSON.stringify(cena.fechada));
+
+  check(cena.antes.voce === '1' && cena.antes.inimigo === '1', 'a rodada fechada não ficou 1 a 1');
+  check(cena.durante.voce === '1',
+    `com a rodada ainda aberta o placar já marca ${cena.durante.voce} — está se adiantando à decisão`);
+  check(cena.durante.pendVoce === '+1',
+    `a eliminação da rodada em curso devia aparecer como "+1" e apareceu como "${cena.durante.pendVoce}"`);
+  check(cena.fechada.voce === '2' && cena.fechada.inimigo === '2',
+    `a rodada fechou 1 a 1 e o placar ficou ${cena.fechada.voce} a ${cena.fechada.inimigo}, devia ser 2 a 2`);
+  check(cena.fechada.pendVoce === '' && cena.fechada.pendInimigo === '',
+    'com a rodada fechada não pode sobrar nenhum "+1" pendurado');
+}
+
 await p.evaluate(() => window.game.hud.setScore(0, 0, 1));
 await p.screenshot({ path: 'tools/_placar.png' });
 console.log('  tools/_placar.png');

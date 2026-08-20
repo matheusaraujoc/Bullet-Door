@@ -4,6 +4,8 @@ import { worldToCell, randomFloorCell, mulberry32, roomAt, DOOR, cellAt } from '
 import { findPath, hasLineOfSight, gridDistance } from '../ai/Pathfinder.js';
 import { Actor } from './Actor.js';
 
+const UP_TIRO = new THREE.Vector3(0, 1, 0);
+
 const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 /**
@@ -367,19 +369,38 @@ export class Bot {
     this.audio.playAt('shot', this.pos, target.pos, target.yaw, 100, 1);
     this.game.emitNoise(this.pos, CFG.NOISE.shot, this);
     const boca = this.actor.muzzleWorld(new THREE.Vector3());
-    this.game.spawnTracer(boca, target.pos.clone().setY(1.1));
     this.game.spawnMuzzleFlash(boca, target.pos);
 
+    /*
+     * A pontaria erra, e o erro entra na DIREÇÃO do disparo — não no resultado.
+     *
+     * Antes a conta era só angular: se o ângulo do bot caísse dentro da largura
+     * do alvo, era acerto, e pronto. Nada nessa conta sabia da existência de
+     * paredes, então o inimigo acertava através de muro e de porta fechada. Com
+     * o erro aplicado ao vetor e a bala percorrendo o caminho, o que estiver na
+     * frente é o que leva o tiro — e um jogador atrás de uma porta está atrás
+     * de uma porta.
+     */
     const frieza = 2.6 - 1.6 * this.aimWarm;     // 2,6x de erro no primeiro tiro
     const err = CFG.BOT_AIM_ERROR * frieza
       * (1 + dist / 22)
       * (1 + (target.speed || 0) / 5.5)          // alvo correndo é bem mais difícil
       * (1 + this.speed / 5);                    // e atirar em movimento também atrapalha
-    const toT = Math.atan2(target.pos.x - this.pos.x, target.pos.z - this.pos.z);
-    const off = Math.abs(angDiff(this.yaw + (this.rnd() - 0.5) * err * 2, toT));
-    const largura = Math.atan2(0.42, Math.max(1, dist));
-    if (off < largura) this.game.onBotHitPlayer(this, target);
-    else this.game.onBotMissed(this, target);
+
+    const alvoY = (target.eye ?? 1.6) - 0.35;    // meio do tronco, não a cabeça
+    const dir = new THREE.Vector3(
+      target.pos.x - boca.x,
+      alvoY - boca.y,
+      target.pos.z - boca.z).normalize();
+
+    // desvio lateral e vertical, o vertical menor: errar para os lados é o
+    // erro natural de quem gira o corpo atrás de um alvo que corre
+    const lado = new THREE.Vector3(dir.z, 0, -dir.x).normalize();
+    dir.addScaledVector(lado, (this.rnd() - 0.5) * 2 * err)
+       .addScaledVector(UP_TIRO, (this.rnd() - 0.5) * 2 * err * 0.45)
+       .normalize();
+
+    this.game.resolverTiroDoBot(this, target, boca, dir);
   }
 
   // ------------------------------------------------------------- FUGITIVO

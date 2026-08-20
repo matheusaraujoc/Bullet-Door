@@ -8,7 +8,7 @@
 // contando quantos pixels da arma sobrevivem com o nariz colado no muro.
 import puppeteer from 'puppeteer-core';
 import { subirVite, matarVite, esperarVite } from './_servidor.mjs';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 
 const exe = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
              'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
@@ -138,6 +138,121 @@ check(guardou > 0.85,
 
 await p.screenshot({ path: 'tools/_arma_parede.png' });
 console.log('  tools/_arma_parede.png');
+
+// ------------------- 3. o clarão sai da boca, não por cima da arma
+/*
+ * O clarão do disparo estava com o teste de profundidade desligado e desenhava
+ * por cima de tudo, inclusive das partes da arma que estão na FRENTE dele. Na
+ * tela isso lê como um clarão saindo por trás da arma e vazando pelo cano.
+ *
+ * A medida: fotografa com e sem clarão e vê onde os pixels mudaram. Se algum
+ * deles cair na metade de baixo da arma — o punho e o carregador, que estão
+ * bem mais perto da câmera que a boca — é porque o clarão está atravessando.
+ */
+{
+  const montagem = await p.evaluate(() => {
+    const f = window.game.player.vm.flash;
+    const mats = [...f.grupo.children].map(m => m.material).filter(Boolean);
+    return {
+      testaProfundidade: mats.every(m => m.depthTest === true),
+      escreveProfundidade: mats.some(m => m.depthWrite === true),
+    };
+  });
+  console.log('clarão   :', JSON.stringify(montagem));
+  check(montagem.testaProfundidade,
+    'o clarão ignora profundidade — desenha por cima da arma inteira');
+  check(!montagem.escreveProfundidade,
+    'o clarão escreve profundidade: uma ponta da estrela vai recortar a outra');
+
+  /*
+   * A pergunta é "o clarão pinta EM CIMA da arma?", e a resposta tem que ser
+   * medida contra a arma, não contra um retângulo.
+   *
+   * A versão anterior chutava a região do punho como "terço de baixo, metade
+   * da direita" — e ali cabe muito espaço vazio ao lado da arma. As pontas da
+   * estrela caindo nesse vazio contavam como se estivessem por cima da peça, e
+   * o teste acusava atravessamento quando o clarão só estava grande.
+   *
+   * Três quadros resolvem: com arma e sem clarão, SEM arma e sem clarão (a
+   * diferença é a silhueta exata da arma), e com arma e com clarão (a diferença
+   * é o clarão). Aí é só ver quanto do clarão caiu dentro da silhueta.
+   */
+  const foto = async () => 'data:image/png;base64,' + await p.screenshot({ encoding: 'base64' });
+
+  await p.evaluate(() => {
+    const g = window.game;
+    g.player.setRole('hunter');
+    g.player.vm.visible = true;
+    g.player.vel.set(0, 0, 0);
+    g.player.speed = 0;
+    g.player.vm.flash.apagar();
+    g.paused = true;                        // nada mais se mexe daqui em diante
+    g._desenhar();
+  });
+  await new Promise(r => setTimeout(r, 150));
+  const comArma = await foto();
+
+  await p.evaluate(() => { window.game.player.vm.visible = false; window.game._desenhar(); });
+  await new Promise(r => setTimeout(r, 150));
+  const semArma = await foto();
+
+  await p.evaluate(() => {
+    const g = window.game;
+    g.player.vm.visible = true;
+    g.player.vm.flash.disparar();
+    g._desenhar();
+  });
+  await new Promise(r => setTimeout(r, 150));
+  const comClarao = await foto();
+  await p.evaluate(() => { window.game.paused = false; });
+
+  const onde = await p.evaluate(async (aSrc, bSrc, cSrc) => {
+    const carregar = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.src = src; });
+    const [ia, ib, ic] = await Promise.all([carregar(aSrc), carregar(bSrc), carregar(cSrc)]);
+    const c = document.createElement('canvas');
+    c.width = ia.width; c.height = ia.height;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const pixels = img => { ctx.clearRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0);
+                            return ctx.getImageData(0, 0, c.width, c.height).data; };
+    const A = pixels(ia), B = pixels(ib), C = pixels(ic);
+    const dif = (X, Y, i) => Math.abs(X[i] - Y[i]) + Math.abs(X[i + 1] - Y[i + 1]) + Math.abs(X[i + 2] - Y[i + 2]);
+
+    let arma = 0, clarao = 0, porCima = 0;
+    let cx0 = 1e9, cy0 = 1e9, cx1 = -1, cy1 = -1;
+    for (let y = 0; y < c.height; y++) {
+      for (let x = 0; x < c.width; x++) {
+        const i = (y * c.width + x) * 4;
+        const ehArma = dif(A, B, i) > 24;          // some quando a arma some
+        const ehClarao = dif(C, A, i) > 40;        // aparece quando o clarão acende
+        if (ehArma) arma++;
+        if (ehClarao) {
+          clarao++;
+          if (ehArma) porCima++;
+          if (x < cx0) cx0 = x; if (x > cx1) cx1 = x;
+          if (y < cy0) cy0 = y; if (y > cy1) cy1 = y;
+        }
+      }
+    }
+    return {
+      arma, clarao, porCima, tela: `${c.width}x${c.height}`,
+      caixa: clarao ? { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 } : null,
+    };
+  }, comArma, semArma, comClarao);
+
+  const fracao = onde.clarao ? onde.porCima / onde.clarao : 0;
+  console.log(`arma na tela  : ${onde.arma} pixels`);
+  console.log(`clarão na tela: ${onde.clarao} pixels em ${JSON.stringify(onde.caixa)} | ` +
+              `${onde.porCima} sobre a arma (${(fracao * 100).toFixed(1)}%)`);
+  check(onde.arma > 3000, `a arma nem apareceu para comparar (${onde.arma} pixels)`);
+  check(onde.clarao > 300, `o clarão mal apareceu (${onde.clarao} pixels)`);
+  check(fracao < 0.05,
+    `${(fracao * 100).toFixed(0)}% do clarão cai sobre a silhueta da arma — está atravessando ela`);
+
+  // grava o quadro ACESO, não um novo: quando esta linha roda o clarão já
+  // apagou faz tempo, e a foto mostraria uma arma sem clarão nenhum
+  writeFileSync('tools/_clarao.png', Buffer.from(comClarao.split(',')[1], 'base64'));
+  console.log('  tools/_clarao.png');
+}
 
 if (erros.length) { falhas++; console.log('ERROS:', erros.slice(0, 4).join(' | ')); }
 await b.close(); matarVite(vite, PORT);

@@ -169,27 +169,63 @@ check(fim.titulo === 'VICTORY', `o título saiu "${fim.titulo}"`);
 check(fim.lado === 'ENEMY', `o lado adversário saiu "${fim.lado}"`);
 check(fim.denovo === 'PLAY AGAIN', `o botão saiu "${fim.denovo}"`);
 
-// ------------------ 5b. sobreviver sendo caçado tem que ser dito
+// ------------------ 5b. cada desfecho de rodada diz o que de fato houve
 /*
  * A rodada fecha logo depois da metade de fuga, então esta é a primeira coisa
- * que se lê depois de escapar — e ela dizia só "VOCÊ ELIMINOU", falando de um
- * tiro dado um minuto antes e ignorando o que a pessoa acabou de fazer.
+ * que se lê depois de escapar — e ela precisa falar do que a PESSOA fez, não do
+ * placar. As quatro saídas vêm das duas perguntas da rodada: acertou na
+ * caçada? escapou na fuga?
+ *
+ * Já houve aqui um "ELIMINARAM OS DOIS", que nem português direito é: lê como
+ * se duas pessoas tivessem caído, quando o que houve foi um ponto para cada
+ * lado.
  */
 const mensagens = await p.evaluate(async () => {
   const g = window.game;
+  const mod = await import('/src/ui/i18n.js');
   const ler = (seu, dele) => {
     g.onRoundEnded(seu, dele, seu, dele);
     return document.querySelector('.bm-sub').textContent;
   };
-  return { venceu: ler(1, 0), osDois: ler(1, 1), perdeu: ler(0, 1), ninguem: ler(0, 0) };
+  const porIdioma = {};
+  for (const cod of ['pt', 'es', 'en']) {
+    mod.trocarIdioma(cod);
+    porIdioma[cod] = {
+      limpa: ler(1, 0),      // eliminou e escapou
+      trocada: ler(1, 1),    // eliminou e caiu
+      vazia: ler(0, 0),      // ninguém acertou
+      perdida: ler(0, 1),    // errou e caiu
+    };
+  }
+  mod.trocarIdioma('en');
+  return porIdioma;
 });
-console.log('rodadas  :', JSON.stringify(mensagens));
-check(/SURVIVED/i.test(mensagens.venceu),
-  `ganhou a rodada eliminando e sobrevivendo, e a tela só disse "${mensagens.venceu}"`);
-check(/SURVIVED/i.test(mensagens.ninguem),
-  `ninguém eliminou mas os dois sobreviveram, e a tela disse "${mensagens.ninguem}"`);
-check(!/SURVIVED/i.test(mensagens.perdeu),
-  `você foi abatido e a tela falou em sobreviver: "${mensagens.perdeu}"`);
+
+for (const [cod, m] of Object.entries(mensagens)) {
+  console.log(`rodadas ${cod} :`, JSON.stringify(m));
+
+  // as quatro têm que ser DIFERENTES entre si: duas iguais quer dizer que um
+  // desfecho está sendo contado como outro
+  const distintas = new Set(Object.values(m));
+  check(distintas.size === 4,
+    `${cod}: só ${distintas.size} frases distintas para 4 desfechos de rodada`);
+  for (const [caso, frase] of Object.entries(m)) {
+    check(frase.length > 6 && frase !== 'jogo.rodada' + caso,
+      `${cod}: o desfecho "${caso}" saiu como "${frase}"`);
+  }
+}
+
+// e o conteúdo, no idioma que este teste está usando
+{
+  const en = mensagens.en;
+  check(/SURVIVED/i.test(en.limpa), `eliminou e escapou, e a tela disse "${en.limpa}"`);
+  check(/KILLED/i.test(en.trocada) && /(DIED|FLEE)/i.test(en.trocada),
+    `eliminou mas caiu na fuga, e a tela disse "${en.trocada}"`);
+  check(!/SURVIVED/i.test(en.perdida),
+    `errou a caçada e foi abatido, mas a tela fala em sobreviver: "${en.perdida}"`);
+  check(!/SURVIVED/i.test(en.trocada),
+    `foi abatido na fuga, mas a tela fala em sobreviver: "${en.trocada}"`);
+}
 
 // ------------------------------- 6. "BOT" não pode ter sobrado em lugar nenhum
 const sobrouBot = await p.evaluate(() => {
