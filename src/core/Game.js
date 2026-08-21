@@ -10,6 +10,7 @@ import { criarBotoesDeCanto } from '../ui/Canto.js';
 import { FimDePartida } from '../ui/FimDePartida.js';
 import { t, aplicarNoDocumento, aoTrocarIdioma } from '../ui/i18n.js';
 import { criarSeletorDeIdioma } from '../ui/SeletorIdioma.js';
+import { gameplayStart, gameplayStop, comIntervaloComercial } from './Poki.js';
 import { World } from '../world/World.js';
 import { generateMap, randomFloorCell, mulberry32 } from '../world/MazeGen.js';
 import { gridDistance } from '../ai/Pathfinder.js';
@@ -100,6 +101,7 @@ export class Game {
     this.running = false;
     this.paused = false;
     this.ready = false;
+    this._anuncio = false;   // true enquanto um intervalo comercial do Poki pode estar tocando
     this.clock = new THREE.Clock();
     this.raycastTargets = [];
 
@@ -290,15 +292,36 @@ export class Game {
      * trilha por cima disso não é ambientação, é ruído em cima da única pista
      * que o jogador tem de onde o outro está.
      */
+    /*
+     * O primeiro JOGAR não passa por intervalo comercial.
+     *
+     * "Intervalo" pressupõe algo em andamento para interromper, e na primeira
+     * entrada não há nada ainda — é literalmente o que o SDK do Poki confere:
+     * pedir um `commercialBreak` antes de qualquer `gameplayStart` da sessão
+     * não é recusado na hora, mas fica preso por um bom tempo até o SDK se
+     * recompor sozinho ("commercialBreak not possible before gameplayStart",
+     * no console deles). `gameplayStart` direto aqui é o que os próprios
+     * exemplos do Poki mostram para "a primeira fase carrega".
+     *
+     * Continuar (depois de pausar) e Jogar de novo (depois do fim de partida)
+     * são intervalos de verdade — aí sim há uma sessão em andamento para
+     * `comIntervaloComercial` interromper.
+     */
     document.getElementById('btnPlay').onclick = () => {
-      if (!this.ready) return;
+      if (!this.ready || this._anuncio) return;
       this.audio.init(); this.audio.resume(); this.audio.play('click');
       this.audio.pararMusica();
       menu.classList.add('hidden');
       this.startMatch();
+      gameplayStart();
     };
-    document.getElementById('btnResume').onclick = () => { this.audio.play('click'); this.resume(); };
+    document.getElementById('btnResume').onclick = () => {
+      if (this._anuncio) return;
+      this.audio.play('click');
+      comIntervaloComercial(this, () => this.resume());
+    };
     document.getElementById('btnQuit').onclick = () => {
+      if (this._anuncio) return;
       this.audio.play('click');
       pause.classList.add('hidden');
       this.running = false;
@@ -307,6 +330,7 @@ export class Game {
       this.audio.tocarMusica('audios/menu.mp3');
     };
     document.getElementById('btnMenu').onclick = () => {
+      if (this._anuncio) return;
       this.audio.play('click');
       this.fim.esconder();
       this.hud.show(false);
@@ -314,10 +338,13 @@ export class Game {
       menu.classList.remove('hidden');
     };
     document.getElementById('btnAgain').onclick = () => {
+      if (this._anuncio) return;
       this.audio.play('click');
       this.fim.esconder();
-      this.audio.pararMusica();
-      this.startMatch();
+      comIntervaloComercial(this, () => {
+        this.audio.pararMusica();
+        this.startMatch();
+      });
     };
     /*
      * ESC é sempre saída, nunca entrada.
@@ -333,12 +360,12 @@ export class Game {
      * clique na cena. Nenhum dos dois pode acontecer sem querer.
      */
     addEventListener('keydown', e => {
-      if (e.code !== 'Escape') return;
+      if (e.code !== 'Escape' || this._anuncio) return;
       this.input.unlock();
       if (this.running && !this.paused) this.pause();
     });
     this.canvas.addEventListener('click', () => {
-      if (!this.input.precisaTravar()) return;
+      if (this._anuncio || !this.input.precisaTravar()) return;
       if (this.running && !this.paused && !this.input.locked) this.input.lock();
     });
   }
@@ -393,6 +420,7 @@ export class Game {
   }
 
   pause() {
+    gameplayStop();               // "level finish, game over, pause, quit to menu"
     this.paused = true;
     this.input.unlock();
     document.getElementById('pause').classList.remove('hidden');
@@ -403,6 +431,26 @@ export class Game {
     document.getElementById('pause').classList.add('hidden');
     if (this.input.precisaTravar()) this.input.lock();
     this.clock.getDelta();
+  }
+
+  /**
+   * O jogo enquanto um `commercialBreak` do Poki pode estar tocando.
+   *
+   * A documentação pede três coisas ao redor do anúncio: parar o jogo, calar
+   * o áudio e travar a entrada — e desfazer tudo na volta. Fica num método só
+   * porque as três entradas em partida (jogar, continuar, jogar de novo)
+   * passam pela mesma sequência.
+   */
+  travarParaAnuncio(v) {
+    this._anuncio = v;
+    if (v) {
+      this.paused = true;
+      this.input.unlock();
+      this.audio.pararMusica();
+      this.audio.ctx?.suspend();
+    } else if (this.audio.ctx && this.audio.somLigado) {
+      this.audio.ctx.resume();
+    }
   }
 
   // ----------------------------------------------------------------- nível
@@ -539,6 +587,7 @@ export class Game {
   }
 
   onMatchEnded(vencedor) {
+    gameplayStop();                // "level finish, game over"
     this.hud.hideBig();
     this.hud.show(false);
     this.input.unlock();

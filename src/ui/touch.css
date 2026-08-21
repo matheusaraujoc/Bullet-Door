@@ -19,10 +19,21 @@
   pointer-events: auto; touch-action: none;
 }
 
+/*
+ * Os controles escalam pela ALTURA da janela, não pela largura.
+ *
+ * O jogo é jogado deitado, e a media query anterior ("max-width: 560px")
+ * reagia à dimensão errada para esse caso: um celular deitado tem 650 a 900px
+ * de LARGURA, então a query nunca disparava e o joystick ficava sempre no
+ * tamanho máximo -- 132px de lado, mais de um terço da altura da tela num
+ * aparelho comum. clamp(mín, Xvh, máx) usa a altura, que é a dimensão que
+ * realmente aperta em paisagem, e escala sem depender de um ponto de quebra.
+ */
+
 /* ------------------------------- joystick ------------------------------- */
 #toque .joy {
-  position: absolute; left: 22px; bottom: 22px;
-  width: 132px; height: 132px;
+  position: absolute; left: clamp(12px, 3vw, 22px); bottom: clamp(12px, 3vh, 22px);
+  width: clamp(82px, 21vh, 132px); height: clamp(82px, 21vh, 132px);
   pointer-events: auto; touch-action: none;
 }
 #toque .pad, #toque .nub {
@@ -30,13 +41,13 @@
   transform: translate(-50%, -50%);
   image-rendering: pixelated; pointer-events: none;
 }
-#toque .pad { width: 132px; height: 132px; opacity: .82; }
-#toque .nub { width: 62px; height: 62px; opacity: .95; transition: transform .06s linear; }
+#toque .pad { width: 100%; height: 100%; opacity: .82; }
+#toque .nub { width: 47%; height: 47%; opacity: .95; transition: transform .06s linear; }
 
 /* -------------------------------- botões -------------------------------- */
 #toque .botoes {
-  position: absolute; right: 18px; bottom: 16px;
-  display: grid; gap: 10px;
+  position: absolute; right: clamp(10px, 2.6vw, 18px); bottom: clamp(9px, 2.3vh, 16px);
+  display: grid; gap: clamp(6px, 1.5vh, 10px);
   grid-template-columns: repeat(3, auto);
   grid-template-areas:
     ".       correr  agachar"
@@ -52,7 +63,8 @@
 
 #toque .bt {
   pointer-events: auto; touch-action: none;
-  width: 68px; height: 68px; padding: 0; border: 0; background: transparent;
+  width: clamp(46px, 12vh, 68px); height: clamp(46px, 12vh, 68px);
+  padding: 0; border: 0; background: transparent;
   background-image: var(--img); background-size: 100% 100%;
   image-rendering: pixelated; cursor: pointer;
   display: grid; place-items: center;
@@ -60,30 +72,24 @@
   transition: transform .06s ease, filter .12s ease;
 }
 #toque .bt span {
-  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  font-size: clamp(9px, 2vh, 11px); font-weight: 700; letter-spacing: .08em;
   text-shadow: 0 1px 2px rgba(0,0,0,.9); pointer-events: none;
 }
 #toque .bt.apertado { transform: scale(.92); filter: brightness(1.6); }
 #toque .bt.ligado { filter: brightness(1.5) saturate(1.4); color: #feae34; }
 
 /* atirar é o botão que a mão procura sem olhar: maior e marcado */
-#toque .bt-atirar { width: 92px; height: 92px; color: #ffb4a2; }
-#toque .bt-atirar span { font-size: 11px; }
+#toque .bt-atirar {
+  width: clamp(62px, 16vh, 92px); height: clamp(62px, 16vh, 92px); color: #ffb4a2;
+}
+#toque .bt-atirar span { font-size: clamp(9px, 2vh, 11px); }
 #toque .bt-atirar.apertado { filter: brightness(1.9) saturate(1.5); }
 
 /* --------------------------- espiar pelos cantos ------------------------ */
 #toque .espiar {
-  position: absolute; left: 26px; bottom: 172px;
-  display: flex; gap: 10px; pointer-events: none;
+  position: absolute; left: clamp(14px, 3.5vw, 26px);
+  bottom: calc(clamp(82px, 21vh, 132px) + clamp(24px, 5vh, 38px));
+  display: flex; gap: clamp(6px, 1.5vh, 10px); pointer-events: none;
 }
-#toque .espiar .bt { width: 52px; height: 52px; }
-#toque .espiar .bt span { font-size: 15px; }
-
-@media (max-width: 560px) {
-  #toque .joy { width: 112px; height: 112px; left: 14px; bottom: 14px; }
-  #toque .pad { width: 112px; height: 112px; }
-  #toque .nub { width: 52px; height: 52px; }
-  #toque .bt { width: 58px; height: 58px; }
-  #toque .bt-atirar { width: 78px; height: 78px; }
-  #toque .espiar { bottom: 142px; left: 16px; }
-}
+#toque .espiar .bt { width: clamp(36px, 9vh, 52px); height: clamp(36px, 9vh, 52px); }
+#toque .espiar .bt span { font-size: clamp(11px, 2.6vh, 15px); }

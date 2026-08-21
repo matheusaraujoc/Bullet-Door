@@ -175,6 +175,15 @@ if (quadro) {
 
   const estado = await quadro.evaluate(() => {
     const g = window.game;
+    /*
+     * `renderer.info.render` reflete só a ÚLTIMA chamada a `render()`, e
+     * `_desenhar()` faz duas por quadro: o mundo primeiro, a arma depois numa
+     * segunda passada (é o que mantém a arma por cima de tudo, sem entrar em
+     * parede). Ler o contador depois do quadro normal pega só a arma — poucas
+     * dezenas de triângulos — e não o mundo inteiro atrás dela. Para medir o
+     * mundo de verdade, renderiza ele sozinho aqui, fora da dupla passada.
+     */
+    g.renderer.render(g.scene, g.camera);
     return {
       modelosProntos: !!g.assets.ready,
       temPersonagem: !!g.bot?.actor?.object,

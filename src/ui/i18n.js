@@ -24,6 +24,15 @@ const IDIOMAS = {
     'menu.dicaToque': 'use o botão no canto para jogar em tela cheia',
     'menu.idioma': 'IDIOMA',
 
+    // ---- dicas rotativas do menu
+    'menu.dicaRotulo': 'DICA',
+    'dica.1': 'Correr faz barulho: o inimigo pode ouvir seus passos de longe.',
+    'dica.2': 'Agachado você não faz nenhum barulho, mas anda bem mais devagar.',
+    'dica.3': 'Agachado também é bem mais difícil de enxergar à distância.',
+    'dica.4': 'Abrir e fechar portas faz barulho — é uma pista da sua posição.',
+    'dica.5': 'Um tiro é ouvido em quase todo o mapa: nunca é discreto.',
+    'dica.6': 'A borda da tela fica vermelha quando o inimigo está perto e te persegue.',
+
     // ---- controles
     'ctrl.mover': 'mover',
     'ctrl.correr': 'correr — faz barulho',
@@ -125,6 +134,14 @@ const IDIOMAS = {
     'menu.dicaToque': 'usa el botón de la esquina para pantalla completa',
     'menu.idioma': 'IDIOMA',
 
+    'menu.dicaRotulo': 'CONSEJO',
+    'dica.1': 'Correr hace ruido: el enemigo puede oír tus pasos desde lejos.',
+    'dica.2': 'Agachado no haces ningún ruido, pero te mueves mucho más lento.',
+    'dica.3': 'Agachado también es mucho más difícil de ver a distancia.',
+    'dica.4': 'Abrir y cerrar puertas hace ruido — es una pista de tu posición.',
+    'dica.5': 'Un disparo se oye en casi todo el mapa: nunca es discreto.',
+    'dica.6': 'El borde de la pantalla se pone rojo cuando el enemigo está cerca y te persigue.',
+
     'ctrl.mover': 'moverse',
     'ctrl.correr': 'correr — hace ruido',
     'ctrl.agachar': 'agacharse — silencioso',
@@ -218,6 +235,14 @@ const IDIOMAS = {
     'menu.dica': 'click the screen to lock the mouse · <kbd>ESC</kbd> releases it anytime',
     'menu.dicaToque': 'use the corner button to go fullscreen',
     'menu.idioma': 'LANGUAGE',
+
+    'menu.dicaRotulo': 'TIP',
+    'dica.1': 'Running is loud: the enemy can hear your footsteps from far away.',
+    'dica.2': "Crouching makes no noise at all, but you move a lot slower.",
+    'dica.3': 'Crouching also makes you much harder to spot at a distance.',
+    'dica.4': "Opening and closing doors makes noise — it's a clue to your position.",
+    'dica.5': 'A gunshot is heard almost anywhere on the map: never discreet.',
+    'dica.6': "The screen edge turns red when the enemy is close and hunting you.",
 
     'ctrl.mover': 'move',
     'ctrl.correr': 'sprint — makes noise',

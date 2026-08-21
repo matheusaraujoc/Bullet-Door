@@ -4,6 +4,7 @@ import { Game } from './core/Game.js';
 import { tocarIntro } from './ui/Intro.js';
 import { MenuArte } from './ui/MenuArte.js';
 import { t, aplicarNoDocumento } from './ui/i18n.js';
+import { init as pokiInit, gameLoadingFinished as pokiCarregou, evitarRolagemDaPagina } from './core/Poki.js';
 
 // Atalhos de teste pela URL:
 //   ?fast      encurta as fases e pula a abertura
@@ -11,6 +12,12 @@ import { t, aplicarNoDocumento } from './ui/i18n.js';
 //   ?seed=123  fixa o mapa
 const q = new URLSearchParams(location.search);
 if (q.has('fast')) { CFG.PHASE_TIME = 8; CFG.INTRO_TIME = 1; CFG.SWAP_TIME = 1; }
+
+evitarRolagemDaPagina();
+// "Initialize the SDK at the start of your game" — antes de qualquer outra
+// coisa, e sem esse controle não bloquear o restante: fora do Poki o SDK nem
+// existe, e Poki.init() já resolve na hora nesse caso.
+await pokiInit();
 
 const canvas = document.getElementById('scene');
 const game = new Game(canvas);
@@ -36,8 +43,14 @@ btn.textContent = t('menu.carregando');
 // jogador saber que a espera tem fim
 const carga = { progresso: 0, pronto: false };
 const carregando = game.load(p => { carga.progresso = p; }).then(
-  () => { carga.pronto = true; carga.progresso = 1; btn.disabled = false; btn.textContent = t('menu.jogar'); },
-  e => { carga.pronto = true; btn.textContent = t('menu.erro'); console.error('falha ao carregar os modelos:', e); });
+  () => {
+    carga.pronto = true; carga.progresso = 1; btn.disabled = false; btn.textContent = t('menu.jogar');
+    pokiCarregou();     // é isso que faz o loading do Poki sumir
+  },
+  e => {
+    carga.pronto = true; btn.textContent = t('menu.erro'); console.error('falha ao carregar os modelos:', e);
+    pokiCarregou();     // carregou errado, mas carregou — o loader deles não pode ficar preso
+  });
 
 if (!q.has('fast') && !q.has('semintro')) await tocarIntro({ carga });
 menu.classList.remove('hidden');

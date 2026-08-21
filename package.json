@@ -34,7 +34,9 @@
     "test:balistica": "node tools/test-balistica.mjs",
     "test:geometria": "node tools/test-geometria.mjs",
     "test:som": "node tools/test-som.mjs",
-    "audio": "node tools/otimizar-audio.mjs"
+    "audio": "node tools/otimizar-audio.mjs",
+    "test:poki": "node tools/test-poki.mjs",
+    "poki": "vite build && node tools/empacotar-poki.mjs"
   },
   "devDependencies": {
     "lamejs": "^1.2.1",

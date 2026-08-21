@@ -2,7 +2,7 @@
 // sequestrar o mouse.
 //   node tools/test-teclado.mjs
 import puppeteer from 'puppeteer-core';
-import { subirVite, matarVite, esperarVite } from './_servidor.mjs';
+import { subirVite, matarVite, esperarVite, bloquearPoki } from './_servidor.mjs';
 import { existsSync } from 'node:fs';
 
 const exe = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -13,6 +13,9 @@ const b = await puppeteer.launch({ executablePath: exe, headless: 'shell',
   args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox','--window-size=1280,720'] });
 const p = await b.newPage();
 await p.setViewport({ width: 1280, height: 720 });
+// este arquivo clica de verdade em Continuar, que aciona um commercialBreak —
+// sem bloquear o SDK real, isso pediria um anúncio de vídeo a um leilão real
+await bloquearPoki(p);
 const erros = [];
 p.on('pageerror', e => erros.push('PAGEERROR: ' + e.message));
 
@@ -136,13 +139,25 @@ check(escape.depoisDoSegundo.pedidos === 0,
   `ESC pediu o ponteiro ${escape.depoisDoSegundo.pedidos}x — é isso que prende o mouse`);
 check(escape.depoisDoEvento.pedidos === 0, 'o evento de lock atrasado pediu o ponteiro de volta');
 
-// e o botão Continuar, esse sim, pode pedir o ponteiro
-const continuar = await p.evaluate(() => {
+/*
+ * E o botão Continuar, esse sim, pode pedir o ponteiro — mas não mais na
+ * mesma volta do laço.
+ *
+ * Continuar passa agora por `comIntervaloComercial` (Poki.js): é o ponto exato
+ * que a documentação do Poki chama de intervalo natural para um anúncio, então
+ * a retomada espera essa promessa resolver antes de chamar `resume()`. Neste
+ * computador o SDK de verdade carrega (há rede até o CDN do Poki) e resolve em
+ * poucos milissegundos mesmo fora do site deles — mas ainda é assíncrono, e o
+ * teste antigo lia o estado na mesma instrução do clique. Por isso a espera.
+ */
+const continuar = await p.evaluate(async () => {
   const g = window.game;
   let pedidos = 0;
   const original = g.input.lock.bind(g.input);
   g.input.lock = () => { pedidos++; };
   document.getElementById('btnResume').click();
+  const ate = Date.now() + 4000;
+  while (g.paused && Date.now() < ate) await new Promise(r => setTimeout(r, 20));
   const r = { pausado: g.paused, pedidos };
   g.input.lock = original;
   return r;

@@ -4,6 +4,7 @@ node_modules/
 # Saída do build (npm run build) e o pacote de publicação (npm run itch)
 dist/
 *.zip
+introduction
 
 # Sobras dos scripts de teste em tools/.
 # Só imagens e arquivos temporários: tools/_servidor.mjs começa com "_" e é

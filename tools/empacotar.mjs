@@ -34,5 +34,6 @@ console.log(`
     1. Novo projeto, "Kind of project" = HTML
     2. Suba ${SAIDA} e marque "This file will be played in the browser"
     3. Viewport sugerido: 1280 x 720, com "Fullscreen button" ligado
-    4. "Mobile friendly" desmarcado — o jogo é de mouse e teclado
+    4. "Mobile friendly" pode ficar marcado — o jogo tem controles na tela e o
+       HUD escala para celular deitado
 `);

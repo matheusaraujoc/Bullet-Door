@@ -116,25 +116,42 @@ body.runner #crosshair { opacity: 0; }
 body.mirando #crosshair { opacity: 0; }
 
 /* ---- topo: papel, relógio e a régua da fase, num painel só ---- */
+/*
+ * O HUD de jogo escala por ALTURA da janela, não por largura.
+ *
+ * Um FPS jogado no celular é jogado deitado, e deitado a dimensão que aperta é
+ * a altura -- 375 a 430px contra os 720 do desktop de referência. Fonte e
+ * espaçamento em px fixo não sabem disso: o relógio de 58px, que ocupa 8% da
+ * tela num monitor, virava 15% da altura sozinho num iPhone, e três blocos
+ * empilhados (papel, relógio, objetivo) chegavam perto de metade da tela.
+ *
+ * clamp(mín, Xvh, máx) resolve sem precisar de pontos de quebra: o mínimo é
+ * calibrado para a menor altura de celular comum (~360px), o máximo é o
+ * tamanho de desktop de sempre, e entre os dois a curva acompanha a janela.
+ */
 #top {
-  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: clamp(8px, 2.2vh, 16px); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; text-align: center;
   max-width: 92vw;
 }
-#top .painel { padding: 9px 32px 0; min-width: 280px; overflow: hidden; }
+#top .painel {
+  padding: clamp(5px, 1.3vh, 9px) clamp(16px, 4.5vw, 32px) 0;
+  min-width: min(280px, 62vw); overflow: hidden;
+}
 
 #role {
-  font-size: 18px; letter-spacing: .16em; font-weight: 700;
+  font-size: clamp(12px, 2.6vh, 18px); letter-spacing: .16em; font-weight: 700;
   text-indent: .16em; color: var(--acento);
   text-shadow: 0 0 16px var(--acento-br);
 }
 #timer {
-  font-size: 58px; font-weight: 700; letter-spacing: .03em; line-height: 1.02;
+  font-size: clamp(30px, 8vh, 58px); font-weight: 700; letter-spacing: .03em; line-height: 1.02;
   font-variant-numeric: tabular-nums;
 }
 /* régua colada na base do painel, e não uma barra solta */
 #phasebar {
-  height: 7px; margin: 8px -32px 0; background: rgba(255, 255, 255, .09); overflow: hidden;
+  height: clamp(4px, 1vh, 7px); margin: clamp(4px, 1.1vh, 8px) clamp(-16px, -4.5vw, -32px) 0;
+  background: rgba(255, 255, 255, .09); overflow: hidden;
 }
 #phasebar i {
   display: block; height: 100%; width: 100%; transform-origin: left;
@@ -142,10 +159,10 @@ body.mirando #crosshair { opacity: 0; }
   box-shadow: 0 0 12px currentColor;
 }
 #objective {
-  margin-top: 10px; font-size: 15px; font-weight: 700;
+  margin-top: clamp(5px, 1.4vh, 10px); font-size: clamp(11px, 2.1vh, 15px); font-weight: 700;
   letter-spacing: .08em; color: var(--marfim);
   background: var(--painel); border: 2px solid var(--acento-br);
-  border-radius: 999px; padding: 7px 20px; display: inline-block;
+  border-radius: 999px; padding: clamp(4px, 1vh, 7px) clamp(12px, 3.5vw, 20px); display: inline-block;
   box-shadow: 0 4px 16px rgba(0, 0, 0, .45), inset 0 0 20px var(--acento-sw);
 }
 
@@ -155,19 +172,19 @@ body.runner #phasebar { color: var(--runner); }
 @keyframes pulsar { 50% { opacity: .5; } }
 
 /* ---- placar ---- */
-#score { position: absolute; top: 18px; right: 22px; }
-#score .painel { padding: 10px 20px 12px; text-align: center; }
+#score { position: absolute; top: clamp(9px, 2.5vh, 18px); right: clamp(10px, 3vw, 22px); }
+#score .painel { padding: clamp(6px, 1.4vh, 10px) clamp(12px, 3.5vw, 20px) clamp(7px, 1.7vh, 12px); text-align: center; }
 .s-round {
-  font-size: 14px; font-weight: 700; letter-spacing: .08em;
-  color: var(--acento); margin-bottom: 7px;
+  font-size: clamp(10px, 2vh, 14px); font-weight: 700; letter-spacing: .08em;
+  color: var(--acento); margin-bottom: clamp(3px, 1vh, 7px);
 }
-.s-linha { display: flex; align-items: baseline; gap: 9px; justify-content: center; }
-.s-lab { font-size: 14px; font-weight: 700; letter-spacing: .08em; color: var(--fumaca); }
+.s-linha { display: flex; align-items: baseline; gap: clamp(5px, 1.3vw, 9px); justify-content: center; }
+.s-lab { font-size: clamp(10px, 2vh, 14px); font-weight: 700; letter-spacing: .08em; color: var(--fumaca); }
 .s-val {
-  font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-size: clamp(20px, 4.7vh, 34px); font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--marfim); line-height: 1;
 }
-.s-x { color: rgba(150, 168, 196, .5); font-size: 17px; margin: 0 2px; }
+.s-x { color: rgba(150, 168, 196, .5); font-size: clamp(12px, 2.4vh, 17px); margin: 0 2px; }
 
 /*
  * O ponto da rodada em curso, ainda não somado ao placar.
@@ -177,7 +194,7 @@ body.runner #phasebar { color: var(--runner); }
  * para dizer que ainda está em jogo.
  */
 .s-pend {
-  font-style: normal; font-size: 14px; font-weight: 700;
+  font-style: normal; font-size: clamp(10px, 2vh, 14px); font-weight: 700;
   color: var(--laranja-lt); margin: 0 1px; align-self: flex-start;
   animation: pendendo 1.4s ease-in-out infinite;
 }
@@ -193,8 +210,9 @@ body.runner #phasebar { color: var(--runner); }
  * aqui antes, com título, dois rótulos e dois relógios correndo.
  */
 .s-nota {
-  margin-top: 8px; padding-top: 8px; border-top: 2px solid rgba(150, 168, 196, .28);
-  font-size: 12px; font-weight: 700; letter-spacing: .05em;
+  margin-top: clamp(4px, 1.1vh, 8px); padding-top: clamp(4px, 1.1vh, 8px);
+  border-top: 2px solid rgba(150, 168, 196, .28);
+  font-size: clamp(9px, 1.7vh, 12px); font-weight: 700; letter-spacing: .05em;
   color: rgba(214, 226, 242, .6); white-space: nowrap;
 }
 /* quem está na frente acende, para responder de relance quem está ganhando */
@@ -221,20 +239,22 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
 /* ---- aviso de porta ---- */
 #prompt {
   position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
-  font-size: 17px; font-weight: 700; letter-spacing: .07em; padding: 10px 22px;
+  font-size: clamp(12px, 2.4vh, 17px); font-weight: 700; letter-spacing: .07em;
+  padding: clamp(6px, 1.4vh, 10px) clamp(14px, 4vw, 22px);
   background: var(--painel); border: 2px solid rgba(254, 174, 52, .55);
   border-radius: 999px; color: var(--laranja-lt);
   box-shadow: 0 4px 18px rgba(0, 0, 0, .5), inset 0 0 22px rgba(254, 174, 52, .14);
 }
 
 /* ---- arma: munição infinita, o limite é a cadência ---- */
-#weapon { position: absolute; right: 26px; bottom: 22px; text-align: right; }
+#weapon { position: absolute; right: clamp(12px, 3.4vw, 26px); bottom: clamp(12px, 3vh, 22px); text-align: right; }
 #weapon b {
-  font-size: 36px; font-weight: 700; letter-spacing: .06em; color: var(--laranja-lt);
+  font-size: clamp(20px, 5vh, 36px); font-weight: 700; letter-spacing: .06em; color: var(--laranja-lt);
   display: block; line-height: 1; text-shadow: 0 0 20px rgba(254, 174, 52, .45);
 }
 #cooldown {
-  display: block; width: 84px; height: 7px; margin-top: 9px; margin-left: auto;
+  display: block; width: clamp(56px, 12vw, 84px); height: clamp(4px, 1vh, 7px);
+  margin-top: clamp(5px, 1.3vh, 9px); margin-left: auto;
   background: rgba(247,102,22,.2); border-radius: 999px;
   position: relative; overflow: hidden;
 }
@@ -246,7 +266,8 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
 
 /* ---- fôlego ---- */
 #stamina {
-  position: absolute; left: 26px; bottom: 24px; width: 132px; height: 7px;
+  position: absolute; left: clamp(12px, 3.4vw, 26px); bottom: clamp(13px, 3.3vh, 24px);
+  width: clamp(90px, 18vw, 132px); height: clamp(4px, 1vh, 7px);
   background: rgba(255, 255, 255, .12); border-radius: 999px; overflow: hidden;
   opacity: 0; transition: opacity .25s ease;
 }
@@ -268,9 +289,10 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
  * NEGUE O PONTO". Medida fixa para acompanhar um bloco que muda de altura é
  * conta que sempre acaba errada; no fluxo, o navegador faz a conta sozinho.
  */
-#killfeed { margin-top: 8px; text-align: center; }
+#killfeed { margin-top: clamp(4px, 1.1vh, 8px); text-align: center; }
 #killfeed div {
-  font-size: 15px; font-weight: 700; letter-spacing: .07em; margin-bottom: 7px; padding: 8px 20px;
+  font-size: clamp(11px, 2.1vh, 15px); font-weight: 700; letter-spacing: .07em;
+  margin-bottom: clamp(4px, 1vh, 7px); padding: clamp(5px, 1.2vh, 8px) clamp(12px, 3.5vw, 20px);
   background: var(--painel); border: 2px solid var(--acento-br); border-radius: 999px;
   color: var(--acento); animation: subir 2.6s ease-out forwards;
   box-shadow: 0 4px 16px rgba(0, 0, 0, .45);
@@ -288,14 +310,14 @@ body.runner #noisering .blip polygon { fill: var(--runner); }
  * acha que o computador travou, e não é raro fechar a aba no susto.
  */
 #dicaMouse {
-  position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%);
-  font-size: 14px; font-weight: 700; letter-spacing: .06em; color: var(--fumaca);
+  position: absolute; left: 50%; bottom: clamp(40px, 10vh, 74px); transform: translateX(-50%);
+  font-size: clamp(10px, 2vh, 14px); font-weight: 700; letter-spacing: .06em; color: var(--fumaca);
   background: var(--painel); border: 2px solid var(--borda);
-  border-radius: 999px; padding: 8px 20px;
+  border-radius: 999px; padding: clamp(5px, 1.2vh, 8px) clamp(12px, 3.5vw, 20px);
   animation: sumirDica 6s ease-out forwards;
 }
 #dicaMouse kbd {
-  min-width: 0; padding: 3px 9px; margin-right: 8px; font-size: 13px;
+  min-width: 0; padding: 3px 9px; margin-right: 8px; font-size: clamp(10px, 1.8vh, 13px);
 }
 @keyframes sumirDica {
   0% { opacity: 0; } 10% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; }
@@ -314,12 +336,14 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
   align-items: center; justify-content: center; background: rgba(5,4,3,.58);
 }
 .bm-sub {
-  font-size: 18px; font-weight: 700; letter-spacing: .16em;
-  color: var(--fumaca); margin-bottom: 18px;
+  font-size: clamp(12px, 2.6vh, 18px); font-weight: 700; letter-spacing: .1em;
+  color: var(--fumaca); margin-bottom: clamp(8px, 2.4vh, 18px);
+  max-width: 88vw; padding: 0 12px;
 }
 .bm-main {
-  font-size: 68px; font-weight: 700; letter-spacing: .06em; line-height: 1; text-align: center;
-  padding: 18px 48px; background: var(--painel);
+  font-size: clamp(28px, 8vh, 68px); font-weight: 700; letter-spacing: .06em; line-height: 1.05;
+  text-align: center; max-width: 92vw; overflow-wrap: break-word;
+  padding: clamp(10px, 2.4vh, 18px) clamp(20px, 6vw, 48px); background: var(--painel);
   border: 3px solid var(--acento-br); border-radius: 24px;
   box-shadow: 0 14px 44px rgba(0, 0, 0, .55), inset 0 0 40px var(--acento-sw);
 }
@@ -529,6 +553,47 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
 }
 .regra b { color: var(--laranja-lt); font-weight: 700; }
 
+/*
+ * Dicas de jogo, uma por vez, trocando sozinhas.
+ *
+ * Puramente CSS: cada dica é um <span> absoluto com sua PRÓPRIA @keyframes —
+ * porcentagens de keyframe não aceitam variável, então não dá para ter uma
+ * única animação parametrizada por dica. Seis blocos, um ciclo de 24s, 4s
+ * visível por dica, com uma fração de fade nas bordas de cada janela.
+ */
+.dicas-jogo {
+  margin: 0 auto clamp(10px, 2vh, 22px); max-width: 480px;
+  display: flex; align-items: baseline; gap: 10px; text-align: left;
+}
+.dicas-jogo b {
+  flex: none; color: var(--laranja-lt); font-size: 12px; font-weight: 700;
+  letter-spacing: .12em;
+}
+.dj-rotativo {
+  position: relative; flex: 1; min-height: 2.8em;
+  color: var(--fumaca); font-size: 13px; font-weight: 600; line-height: 1.4;
+}
+.dj-rotativo span {
+  position: absolute; inset: 0; opacity: 0;
+  animation-duration: 24s; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
+}
+.dj-rotativo span:nth-child(1) { animation-name: dj0; }
+.dj-rotativo span:nth-child(2) { animation-name: dj1; }
+.dj-rotativo span:nth-child(3) { animation-name: dj2; }
+.dj-rotativo span:nth-child(4) { animation-name: dj3; }
+.dj-rotativo span:nth-child(5) { animation-name: dj4; }
+.dj-rotativo span:nth-child(6) { animation-name: dj5; }
+@keyframes dj0 { 0%, 100% { opacity: 0; } 2.08%, 14.58% { opacity: 1; } 16.67% { opacity: 0; } }
+@keyframes dj1 { 0%, 16.67%, 100% { opacity: 0; } 18.75%, 31.25% { opacity: 1; } 33.33% { opacity: 0; } }
+@keyframes dj2 { 0%, 33.33%, 100% { opacity: 0; } 35.42%, 47.92% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes dj3 { 0%, 50%, 100% { opacity: 0; } 52.08%, 64.58% { opacity: 1; } 66.67% { opacity: 0; } }
+@keyframes dj4 { 0%, 66.67%, 100% { opacity: 0; } 68.75%, 81.25% { opacity: 1; } 83.33% { opacity: 0; } }
+@keyframes dj5 { 0%, 83.33% { opacity: 0; } 85.42%, 97.92% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dj-rotativo span { animation: none !important; opacity: 0; }
+  .dj-rotativo span:first-child { opacity: 1; }
+}
+
 button {
   font-family: var(--fonte); font-size: 20px; letter-spacing: .14em; font-weight: 700;
   color: #1a0d02; background: linear-gradient(180deg, var(--laranja-lt), var(--laranja));
@@ -722,6 +787,11 @@ body.no-toque .hint-toque { display: block; }
  * de o menu existir. Abaixo disso o cartão volta a rolar, que é melhor do que
  * esconder como se joga.
  */
+/* 720/768px de altura (laptops comuns) já ficam justos com as dicas somadas
+   ao resto — elas somem primeiro, bem antes do corte de 640px abaixo. */
+@media (max-height: 800px) {
+  .dicas-jogo { display: none; }
+}
 @media (max-height: 640px) {
   .tag, .selo { display: none; }
   .id-bt img { width: 28px; height: 19px; }

@@ -2,8 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bullet Door</title>
+<!--
+  O SDK do Poki. Vem de um CDN deles, e só existe de verdade quando o jogo roda
+  dentro do portal ou do Inspector — em desenvolvimento, no itch.io, ou em
+  qualquer outro host, o script simplesmente não carrega (o navegador segue em
+  frente sem erro visível) e `src/core/Poki.js` trata `window.PokiSDK` ausente
+  como caso normal, não como falha.
+-->
+<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
 <!-- A marca do jogo em miniatura: o vão da porta, a guilhotina laranja
         descendo, e o furo de bala. Emoji fica à mercê da fonte do sistema e
         muda de cara em cada aparelho; este desenho é sempre o mesmo. -->
@@ -68,6 +76,17 @@
       </div>
       <p class="tag"><span data-i18n="menu.lema1">Um tiro mata.</span><br><span data-i18n="menu.lema2">Trinta segundos caçando, trinta fugindo.</span></p>
       <p class="regra" data-i18n-html="menu.regra">Cada <b>rodada</b> te dá uma caçada e uma fuga.</p>
+      <div class="dicas-jogo">
+        <b data-i18n="menu.dicaRotulo">DICA</b>
+        <div class="dj-rotativo">
+          <span data-i18n="dica.1"></span>
+          <span data-i18n="dica.2"></span>
+          <span data-i18n="dica.3"></span>
+          <span data-i18n="dica.4"></span>
+          <span data-i18n="dica.5"></span>
+          <span data-i18n="dica.6"></span>
+        </div>
+      </div>
       <button id="btnPlay" data-i18n="menu.jogar">JOGAR</button>
       <div class="keys">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em data-i18n="ctrl.mover">mover</em></div>

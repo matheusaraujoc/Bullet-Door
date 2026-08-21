@@ -52,14 +52,22 @@ const lambert = (opts = {}) => new THREE.MeshLambertMaterial({ color: 0xffffff, 
 export function planejarLuminarias(map) {
   const rnd = mulberry32(map.seed ^ 0x1a3b);
   const lamps = [];
+  /*
+   * Luminária e pilar nascem em passos separados e sem se consultar — a
+   * luminária mira o centro (e os cantos) da sala, o pilar sorteia um ponto
+   * qualquer no miolo dela, e nada impedia os dois de caírem na mesma
+   * célula. Quando isso acontece, as duas caixinhas da luminária ficam
+   * cravadas bem no topo do pilar (a "faixa preta" que parecia erro de
+   * textura). O pilar é o que dá cobertura de verdade; a luminária, aqui,
+   * simplesmente não nasce.
+   */
+  const temPilar = (x, y) => map.opacos?.has(y * map.W + x);
   for (const r of map.rooms) {
-    lamps.push({ x: r.cx, y: r.cy, p: 1.45, sala: r });
+    if (!temPilar(r.cx, r.cy)) lamps.push({ x: r.cx, y: r.cy, p: 1.45, sala: r });
     if (r.w >= 5 || r.h >= 5) {
-      lamps.push({
-        x: r.x + (rnd() < 0.5 ? 0 : r.w - 1),
-        y: r.y + (rnd() < 0.5 ? 0 : r.h - 1),
-        p: 0.7, sala: r,
-      });
+      const cx = r.x + (rnd() < 0.5 ? 0 : r.w - 1);
+      const cy = r.y + (rnd() < 0.5 ? 0 : r.h - 1);
+      if (!temPilar(cx, cy)) lamps.push({ x: cx, y: cy, p: 0.7, sala: r });
     }
   }
   for (let y = 1; y < map.H - 1; y++) {
@@ -67,6 +75,7 @@ export function planejarLuminarias(map) {
       const i = y * map.W + x;
       if (map.grid[i] === WALL || map.inRoom[i]) continue;
       if ((x * 5 + y * 11) % 7 !== 0) continue;
+      if (temPilar(x, y)) continue;
       lamps.push({ x, y, p: 0.5, sala: null });
     }
   }
@@ -269,8 +278,20 @@ export class World {
     this.floor.instanceMatrix.needsUpdate = true;
     this.root.add(this.floor);
 
+    /*
+     * `polygonOffset` no teto: bem na quina onde a lateral do pilar encontra a
+     * face de baixo do teto, os dois ficam empatados na profundidade por uma
+     * fração de milímetro — o suficiente para o rasterizador trocar de dono a
+     * cada pixel naquela borda, o cintilar em forma de pente que parecia erro
+     * de textura. Empurrar o teto uma fração para trás desempata sempre a
+     * favor do pilar, sem mudar nenhuma silhueta visível.
+     */
+    const matTeto = flat();
+    matTeto.polygonOffset = true;
+    matTeto.polygonOffsetFactor = 2;
+    matTeto.polygonOffsetUnits = 2;
     this.ceil = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(C, 0.26, C), flat(), floorCells.length);
+      new THREE.BoxGeometry(C, 0.26, C), matTeto, floorCells.length);
     floorCells.forEach(([x, y], i) => {
       m.makeTranslation(x * C, CFG.WALL_H + 0.13, y * C);
       this.ceil.setMatrixAt(i, m);
@@ -336,11 +357,23 @@ export class World {
     const baixos = map.props.filter(p => !p.alto);
 
     if (altos.length) {
+      /*
+       * O pilar sobe um pouco além de CFG.WALL_H, furando o teto por dentro,
+       * em vez de parar rente a ele. Rente é exatamente onde mora o bug: o
+       * topo do pilar e a face de baixo do teto ficam no MESMO plano, e essa
+       * coincidência cintila (o "erro de textura" com o pilar meio dentro,
+       * meio fora). Cortar o teto ali para "resolver" só trocou o cintilar por
+       * um buraco de verdade — dava para ver por fora do mapa por cima do
+       * pilar. Com o pilar furando o teto, o pedaço de teto bem em cima dele
+       * fica atrás de material sólido em qualquer ângulo de dentro da sala, e
+       * o resto do teto ao redor continua cobrindo a célula normalmente.
+       */
+      const ALTURA_PILAR = CFG.WALL_H + 0.3;
       this.pillars = new THREE.InstancedMesh(
-        shadeBox(new THREE.BoxGeometry(C * 0.56, CFG.WALL_H, C * 0.56), CFG.WALL_H),
+        shadeBox(new THREE.BoxGeometry(C * 0.56, ALTURA_PILAR, C * 0.56), ALTURA_PILAR),
         flat({ vertexColors: true }), altos.length);
       altos.forEach((p, i) => {
-        m.makeTranslation(p.x * C, CFG.WALL_H / 2, p.y * C);
+        m.makeTranslation(p.x * C, ALTURA_PILAR / 2, p.y * C);
         this.pillars.setMatrixAt(i, m);
         this.pillars.setColorAt(i, paint(p.x, p.y, p.tema.cor, 0.85));
       });

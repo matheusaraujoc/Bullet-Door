@@ -40,6 +40,34 @@ export function matarVite(proc, porta) {
   }
 }
 
+/**
+ * Impede a página de teste de carregar o SDK real do Poki.
+ *
+ * `index.html` inclui o script deles direto de `game-cdn.poki.com`, como a
+ * própria documentação pede — e nesta máquina, com internet de verdade, ele
+ * carrega e FUNCIONA fora do site do Poki também. O problema é `commercialBreak`
+ * especificamente: depois de um `gameplayStart` de verdade, o SDK decide por
+ * conta própria pedir um anúncio de vídeo real ("requesting video ad in
+ * house-ad mode") a um leilão de anúncio de verdade — que não tem por que
+ * responder rápido, e não deveria: é exatamente o comportamento certo em
+ * produção, só que indesejável num teste automatizado, que precisa ser rápido
+ * e não depender de rede de terceiro para passar.
+ *
+ * Bloquear o script inteiro é mais simples e mais robusto que tentar simular
+ * um `PokiSDK` falso: sem ele, `src/core/Poki.js` cai sozinho no caminho sem
+ * SDK, que é determinístico e não faz pedido nenhum de rede.
+ *
+ * Só é preciso chamar isto nos testes que de fato CLICAM em Continuar ou
+ * Jogar de novo — os que só leem texto/classe do botão não disparam nada.
+ */
+export async function bloquearPoki(page) {
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    if (req.url().includes('game-cdn.poki.com')) req.abort();
+    else req.continue();
+  });
+}
+
 /** Espera o servidor responder, em vez de dormir um tempo fixo e torcer. */
 export async function esperarVite(porta, timeoutMs = 40000) {
   const alvo = `http://localhost:${porta}/`;
