@@ -121,7 +121,7 @@ export async function tocarIntro({ pulavel = true, carga = null } = {}) {
     <div class="pular"></div>
     <div class="comecar">
       <b>${noToque ? t('intro.comecarToque') : t('intro.comecarClique')}</b>
-      <span class="sub">O JOGO USA SOM</span>
+      <span class="sub">${t('intro.usaSom')}</span>
       <div class="carregando"><i></i></div>
     </div>`;
   document.body.appendChild(el);

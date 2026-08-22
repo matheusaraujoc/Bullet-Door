@@ -110,7 +110,9 @@ export class RoundManager {
     this.game.onHalfEnded(role, killed, elapsed);
     if (killed) {
       this.state = 'halfend';
-      this.timer = 1.6;
+      // quando é o jogador que abate, a pausa cobre a câmera lenta da queda
+      // (~1s) mais um tempo de sobra para ler "ALVO ELIMINADO" depois dela
+      this.timer = role === 'hunter' ? 2.2 : 1.6;
     } else {
       this._advance();
     }

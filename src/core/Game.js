@@ -10,10 +10,15 @@ import { criarBotoesDeCanto } from '../ui/Canto.js';
 import { FimDePartida } from '../ui/FimDePartida.js';
 import { t, aplicarNoDocumento, aoTrocarIdioma } from '../ui/i18n.js';
 import { criarSeletorDeIdioma } from '../ui/SeletorIdioma.js';
+import { criarComoJogar } from '../ui/ComoJogar.js';
+import { criarProgressoJogador } from '../ui/ProgressoJogador.js';
+import { criarLoja } from '../ui/Loja.js';
 import { gameplayStart, gameplayStop, comIntervaloComercial } from './Poki.js';
+import { obterProgresso, registrarVitoriaDaPartida, finalizarCorrida, encerrarCorridaSemPremio } from './Progresso.js';
+import { calcularFator, aplicarDificuldade } from './Dificuldade.js';
 import { World } from '../world/World.js';
-import { generateMap, randomFloorCell, mulberry32 } from '../world/MazeGen.js';
-import { gridDistance } from '../ai/Pathfinder.js';
+import { generateMap, randomFloorCell, mulberry32, cellAt, WALL } from '../world/MazeGen.js';
+import { gridDistance, hasLineOfSight } from '../ai/Pathfinder.js';
 import { Assets } from '../entities/Assets.js';
 import { makeFlash } from '../entities/Actor.js';
 import { Player } from '../entities/Player.js';
@@ -102,6 +107,8 @@ export class Game {
     this.paused = false;
     this.ready = false;
     this._anuncio = false;   // true enquanto um intervalo comercial do Poki pode estar tocando
+    this._killcam = null;    // câmera lenta segurando o abate antes da mensagem aparecer
+    this._killcamVoltandoFov = 0;
     this.clock = new THREE.Clock();
     this.raycastTargets = [];
 
@@ -146,6 +153,14 @@ export class Game {
      * e o jogador troca o idioma justamente porque não entende o que está lá.
      */
     criarSeletorDeIdioma(undefined, () => this._retraduzir());
+    criarComoJogar();
+    this._progressoJogador = criarProgressoJogador();
+    this._loja = criarLoja(() => this._progressoJogador?.pintar());
+    document.getElementById('btnLoja').onclick = () => {
+      if (this._anuncio) return;
+      this.audio.play('click');
+      this._loja?.abrir();
+    };
     aoTrocarIdioma(() => this._retraduzir());
     this.toque = new TouchControls(this.input, this);
     const querToque = ehToque() || new URLSearchParams(location.search).has('touch');
@@ -323,6 +338,8 @@ export class Game {
     document.getElementById('btnQuit').onclick = () => {
       if (this._anuncio) return;
       this.audio.play('click');
+      encerrarCorridaSemPremio();
+      this._progressoJogador?.pintar();
       pause.classList.add('hidden');
       this.running = false;
       this.hud.show(false);
@@ -332,6 +349,12 @@ export class Game {
     document.getElementById('btnMenu').onclick = () => {
       if (this._anuncio) return;
       this.audio.play('click');
+      // uma vitória deixa a corrida "em aberto" (a próxima partida seguiria
+      // mais difícil) — escolher o menu em vez de jogar de novo é decidir
+      // parar por conta própria, e isso também fecha a corrida. Sem prêmio
+      // de novo aqui: a vitória que rendeu moeda/XP já pagou na hora certa.
+      encerrarCorridaSemPremio();
+      this._progressoJogador?.pintar();
       this.fim.esconder();
       this.hud.show(false);
       this.running = false;
@@ -368,6 +391,27 @@ export class Game {
       if (this._anuncio || !this.input.precisaTravar()) return;
       if (this.running && !this.paused && !this.input.locked) this.input.lock();
     });
+
+    /*
+     * A explicação de início/troca de rodada tem um tempo generoso pra dar,
+     * mas quem já sabe a regra não devia ficar esperando ela passar sozinha —
+     * um clique ou qualquer tecla adianta direto para o jogo. ESC fica de
+     * fora porque já tem o próprio significado (pausar). O listener é no
+     * `document`, não no canvas: o banner (#bigmsg) cobre a tela inteira por
+     * cima dele, e um clique ali nunca chegaria ao listener do canvas.
+     *
+     * O clique em JOGAR já entra "playing" com rounds.state virando 'intro'
+     * na mesma execução — e esse mesmo clique borbulha até aqui. Sem o
+     * `closest('button')`, o próprio clique que COMEÇA a rodada já zerava o
+     * cronômetro dela: um botão tem a própria ação, não é "pular".
+     */
+    const pularAnuncio = e => {
+      if (this._anuncio || this.paused || !this.running) return;
+      if (e?.target?.closest?.('button')) return;
+      if (this.rounds.state === 'intro' || this.rounds.state === 'swap') this.rounds.timer = 0;
+    };
+    addEventListener('keydown', e => { if (e.code !== 'Escape') pularAnuncio(e); });
+    document.addEventListener('click', pularAnuncio);
   }
 
   /** Reaplica os textos depois de uma troca de idioma. */
@@ -410,6 +454,17 @@ export class Game {
   }
 
   startMatch() {
+    /*
+     * A dificuldade desta partida é decidida aqui, uma vez só, antes de
+     * qualquer rodada começar — não muda no meio de uma partida, só de uma
+     * para a outra. `aplicarDificuldade` mexe direto em CFG.BOT_*, que
+     * Bot.js já lê a cada quadro, e devolve a distância de spawn que
+     * `placeCombatants` usa agora em vez de constantes fixas.
+     */
+    const { vitoriasNaVida, vitoriasNestaCorrida } = obterProgresso();
+    const fator = calcularFator(vitoriasNaVida, vitoriasNestaCorrida);
+    this._spawn = aplicarDificuldade(fator);
+
     this.hud.show(true);
     this.running = true;
     this.paused = false;
@@ -469,17 +524,87 @@ export class Game {
                            this.bot.hitbox, this.playerHitbox];
   }
 
-  /** Põe os dois no mapa, longe um do outro, e devolve as portas ao estado inicial. */
+  /**
+   * Põe os dois no mapa, longe um do outro, e devolve as portas ao estado
+   * inicial. "Longe" depende da dificuldade da partida (ver `startMatch` /
+   * Dificuldade.js): nas primeiras partidas da vida do jogador, ou logo no
+   * início de uma corrida, os dois nascem bem mais perto de propósito — e às
+   * vezes já um na mira do outro, não só perto: `chanceVisao` decide se este
+   * spawn específico exige visão direta entre os dois pontos, não só
+   * distância. Sem isso "perto" ainda podia cair atrás de uma parede, e quem
+   * está aprendendo a regra não tinha o "ah, é ali que eu tenho que atirar"
+   * nos primeiros segundos.
+   */
   placeCombatants(playerRole) {
     this.world.doors.reset();
+    const { spawnMinDist = 11, spawnCandidato = 8, spawnFallback = 7, chanceVisao = 0 } = this._spawn || {};
+    const exigirVisao = this.rnd() < chanceVisao;
+
+    /*
+     * Quando o inimigo vai caçar nesta metade (o jogador foge), nascer colado
+     * nele não dá nem meio segundo de reação — o jogador mal entende o mapa e
+     * já está sendo perseguido. Uma folga extra de distância aqui dá aquele
+     * respiro inicial. Quando é o jogador que caça, a distância atual já
+     * funciona bem (feedback do jogador), então essa folga fica em 1 (nenhuma
+     * mudança) nesse caso.
+     */
+    const folgaCacador = playerRole === 'runner' ? 1.35 : 1;
+    const minDistEfetivo = spawnMinDist * folgaCacador;
+    const candidatoEfetivo = spawnCandidato * folgaCacador;
+    const fallbackEfetivo = spawnFallback * folgaCacador;
+    // mesmo com visão garantida (onboarding), o caçador não pode nascer
+    // colado no jogador que foge — exige uma distância mínima maior antes de
+    // aceitar um candidato "de perto"
+    const minAceitavelVisao = playerRole === 'runner' ? 6 : 2;
 
     const a = randomFloorCell(this.map, this.rnd);
     let b = null;
-    for (let i = 0; i < 40; i++) {
-      const c = randomFloorCell(this.map, this.rnd, a, 8);
-      if (gridDistance(this.world, a, c, 80) >= 11) { b = c; break; }
+
+    /*
+     * `doors.reset()`, uma linha acima, fecha toda porta simples — e uma
+     * porta fechada barra `hasLineOfSight` como uma parede. Isso quer dizer
+     * que quase nenhum par de células em SALAS ou CORREDORES diferentes se
+     * enxerga no instante do spawn — sortear ao acaso no mapa inteiro raras
+     * vezes acerta um par assim, e por sorteio nunca dava pra saber se um
+     * lugar existe sem já ter caído nele.
+     *
+     * Em vez de apostar, varre de verdade a vizinhança de `a` (paredes,
+     * corredores, salas, tanto faz) testando `hasLineOfSight` célula a
+     * célula — poucas centenas de checagens, uma vez por partida, nada caro.
+     * Entre quem se enxerga de verdade, prefere o mais distante ainda dentro
+     * do alcance de visão REAL do bot nesta partida (sem isso o par nascia se
+     * enxergando em linha reta, mas longe demais para o próprio `_canSee` do
+     * bot reconhecer); se ninguém coube nesse alcance, fica com o mais perto
+     * que ainda se enxergue.
+     */
+    if (exigirVisao) {
+      const alcanceCel = (CFG.BOT_VIEW * 0.95) / CFG.CELL;
+      const raio = Math.ceil(alcanceCel) + 3;
+      let melhorDentro = null, distDentro = -1;
+      let melhorFora = null, distFora = Infinity;
+      for (let dy = -raio; dy <= raio; dy++) {
+        for (let dx = -raio; dx <= raio; dx++) {
+          const d = Math.hypot(dx, dy);
+          if (d < minAceitavelVisao) continue;
+          const cx = a.x + dx, cy = a.y + dy;
+          if (cx < 0 || cy < 0 || cx >= this.map.W || cy >= this.map.H) continue;
+          if (cellAt(this.map, cx, cy) === WALL) continue;
+          if (this.map.blocked.has(cy * this.map.W + cx)) continue;
+          if (!hasLineOfSight(this.world, a, { x: cx, y: cy })) continue;
+          if (d <= alcanceCel) { if (d > distDentro) { melhorDentro = { x: cx, y: cy }; distDentro = d; } }
+          else if (d < distFora) { melhorFora = { x: cx, y: cy }; distFora = d; }
+        }
+      }
+      b = melhorDentro || melhorFora;
     }
-    b = b || randomFloorCell(this.map, this.rnd, a, 7);
+
+    if (!b) {
+      for (let i = 0; i < 40; i++) {
+        const c = randomFloorCell(this.map, this.rnd, a, candidatoEfetivo);
+        if (gridDistance(this.world, a, c, 80) >= minDistEfetivo) { b = c; break; }
+      }
+    }
+    b = b || randomFloorCell(this.map, this.rnd, a, fallbackEfetivo);
 
     const pCell = playerRole === 'runner' ? a : b;
     const bCell = playerRole === 'runner' ? b : a;
@@ -490,7 +615,12 @@ export class Game {
     this.player.spawn(pCell, yawPlayer(pCell, bCell) + (this.rnd() - 0.5) * 2.2);
     this.player.setRole(playerRole);
 
-    this.bot.spawn(bCell, yawBot(bCell, pCell) + (this.rnd() - 0.5) * 2.2);
+    // com visão garantida, o bot nasce olhando de verdade na direção do
+    // jogador — o mesmo tanto de variação aleatória de sempre já bastava pra
+    // virar a cara dele pra fora do próprio campo de visão, e o "à vista"
+    // virava "só geometricamente à vista", não "o bot já percebeu"
+    const espalhamentoBot = exigirVisao ? 0.35 : 2.2;
+    this.bot.spawn(bCell, yawBot(bCell, pCell) + (this.rnd() - 0.5) * espalhamentoBot);
     this.bot.setRole(playerRole === 'hunter' ? 'runner' : 'hunter');
 
     this.hud.setDanger(false);
@@ -518,12 +648,17 @@ export class Game {
                       CFG.RODADAS_PADRAO, this.rounds.pontoSeu, this.rounds.pontoBot);
     this.hud.setTimer(CFG.PHASE_TIME);
     this.hud.setPhase(1);
+    // "VOCÊ CAÇA" sozinho não diz quanto tempo dá nem o que está em jogo — a
+    // explicação completa some junto do título quando o jogador já se moveu
+    // (onHalfStarted -> hideBig), então repetir toda vez custa nada e ajuda
+    // quem ainda está aprendendo a regra.
+    const explica = t(role === 'hunter' ? 'jogo.explicaCaca' : 'jogo.explicaFoge', { n: CFG.PHASE_TIME });
     if (comIntro) {
       this.hud.big(t('jogo.rodada', { n: this.rounds.round }),
-        t(role === 'hunter' ? 'jogo.voceCaca' : 'jogo.voceFoge'), role);
+        t(role === 'hunter' ? 'jogo.voceCaca' : 'jogo.voceFoge'), explica, role);
     } else {
       this.audio.play('swap');
-      this.hud.big(t('jogo.troca'), t(role === 'hunter' ? 'jogo.agoraCaca' : 'jogo.agoraFoge'), role);
+      this.hud.big(t('jogo.troca'), t(role === 'hunter' ? 'jogo.agoraCaca' : 'jogo.agoraFoge'), explica, role);
     }
   }
 
@@ -546,8 +681,41 @@ export class Game {
     // O número grande é o ponto, não o cronômetro. Mostrar "8.4s" aqui era o
     // que fazia a velocidade parecer valer alguma coisa — e não vale: o que
     // conta é a eliminação ter acontecido.
-    if (role === 'hunter') this.hud.big(t('jogo.alvoEliminado'), t('jogo.pontoSeu'), 'hunter');
-    else this.hud.big(t('jogo.foiAbatido'), t('jogo.pontoDele'), 'runner');
+    if (role === 'hunter') {
+      // a mensagem só chega depois da câmera lenta segurar a queda do
+      // inimigo — mostrar "ALVO ELIMINADO" no mesmo instante do tiro não dava
+      // tempo de ver o próprio abate acontecer
+      this._killcam = { t: 0, duracao: 0.95 };
+    } else {
+      this.hud.big(t('jogo.foiAbatido'), t('jogo.pontoDele'), '', 'runner');
+    }
+  }
+
+  /**
+   * Câmera lenta do abate: o mundo desacelera por um instante enquanto o
+   * inimigo cai, e um leve fechamento de ângulo (como um zoom) marca o corte.
+   * A mensagem "ALVO ELIMINADO" só entra quando esse instante termina.
+   */
+  _updateKillcam(dtReal) {
+    if (this._killcam) {
+      const k = this._killcam;
+      k.t += dtReal;
+      const fechar = Math.min(1, k.t / (k.duracao * 0.55));
+      this.camera.fov = CFG.FOV - CFG.FOV * 0.12 * fechar;
+      this.camera.updateProjectionMatrix();
+      if (k.t >= k.duracao) {
+        this._killcam = null;
+        this._killcamVoltandoFov = 0.3;
+        this.hud.big(t('jogo.alvoEliminado'), t('jogo.pontoSeu'), '', 'hunter');
+      }
+      return;
+    }
+    if (this._killcamVoltandoFov > 0) {
+      this._killcamVoltandoFov = Math.max(0, this._killcamVoltandoFov - dtReal);
+      const k2 = this._killcamVoltandoFov / 0.3;
+      this.camera.fov = CFG.FOV - CFG.FOV * 0.12 * k2;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /**
@@ -581,7 +749,7 @@ export class Game {
     const cor = seuPonto && !pontoBot ? 'runner' : pontoBot && !seuPonto ? 'hunter' : '';
     if (seuPonto && !pontoBot) this.audio.play('win');
     else if (pontoBot && !seuPonto) this.audio.play('lose');
-    this.hud.big(sub, t('jogo.placar', { seu: placarSeu, dele: placarBot }), cor);
+    this.hud.big(sub, t('jogo.placar', { seu: placarSeu, dele: placarBot }), '', cor);
     // a rodada fechou: o que estava pendente vira número
     this.hud.setScore(placarSeu, placarBot, this.rounds.round, CFG.RODADAS_PADRAO);
   }
@@ -593,7 +761,13 @@ export class Game {
     this.input.unlock();
     this.running = false;
     document.body.classList.remove('danger');
-    this.fim.mostrar(vencedor, this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.historico);
+    /*
+     * Vencer estende a corrida (a próxima partida nasce mais difícil);
+     * perder OU empatar fecha ela agora — o empate não é "quase ganhar" para
+     * este contador, é o mesmo "não venceu" que uma derrota.
+     */
+    const sequencia = vencedor === 'you' ? registrarVitoriaDaPartida() : finalizarCorrida();
+    this.fim.mostrar(vencedor, this.rounds.scoreYou, this.rounds.scoreBot, this.rounds.historico, sequencia);
     this.audio.tocarMusica('audios/menu.mp3');
   }
 
@@ -794,13 +968,17 @@ export class Game {
         this.player.update(dt * 0.0001);
         this.player.vm?.flash.update(dt);
       }
+      // câmera lenta do abate: o inimigo cai em câmera lenta, o resto do
+      // mundo (luzes, fagulhas do impacto) acompanha o mesmo ritmo
+      const dtCena = this._killcam ? dt * 0.28 : dt;
       if (this.bot && vivo) this.bot.update(dt, this.player);
-      else if (this.bot) this.bot.actor.update(dt, 0, this.bot.yaw);
+      else if (this.bot) this.bot.actor.update(dtCena, 0, this.bot.yaw);
 
       this._sincronizarCorpoDoJogador();
       this.world?.doors.update(dt, this.ocupantes());
-      this._updateEffects(dt);
+      this._updateEffects(dtCena);
       this._updateHud(dt, vivo);
+      this._updateKillcam(dt);
     }
     this._desenhar();
   }

@@ -62,7 +62,7 @@
     <div id="dicaMouse" class="hidden"><kbd>ESC</kbd> <span data-i18n="hud.soltaMouse">solta o mouse</span></div>
     <div id="flash"></div>
     <div id="vignette"></div>
-    <div id="bigmsg" class="hidden"><div class="bm-sub"></div><div class="bm-main"></div></div>
+    <div id="bigmsg" class="hidden"><div class="bm-sub"></div><div class="bm-main"></div><div class="bm-explica"></div></div>
   </div>
 
   <!-- ================= MENUS ================= -->
@@ -74,19 +74,7 @@
         <span class="guilhotina"></span>
         <span class="linha-2">DOOR</span>
       </div>
-      <p class="tag"><span data-i18n="menu.lema1">Um tiro mata.</span><br><span data-i18n="menu.lema2">Trinta segundos caçando, trinta fugindo.</span></p>
-      <p class="regra" data-i18n-html="menu.regra">Cada <b>rodada</b> te dá uma caçada e uma fuga.</p>
-      <div class="dicas-jogo">
-        <b data-i18n="menu.dicaRotulo">DICA</b>
-        <div class="dj-rotativo">
-          <span data-i18n="dica.1"></span>
-          <span data-i18n="dica.2"></span>
-          <span data-i18n="dica.3"></span>
-          <span data-i18n="dica.4"></span>
-          <span data-i18n="dica.5"></span>
-          <span data-i18n="dica.6"></span>
-        </div>
-      </div>
+      <div class="regra" id="comoJogar"></div>
       <button id="btnPlay" data-i18n="menu.jogar">JOGAR</button>
       <div class="keys">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em data-i18n="ctrl.mover">mover</em></div>
@@ -106,9 +94,9 @@
         <div><b data-i18n="bt.porta">PORTA</b><em data-i18n="ctrl.tqPorta">abre e fecha por perto</em></div>
         <div><b>&#10094; &#10095;</b><em data-i18n="ctrl.tqEspiar">espiar pelos cantos</em></div>
       </div>
-      <div class="hint" data-i18n-html="menu.dica"></div>
       <div class="hint-toque" data-i18n="menu.dicaToque"></div>
       <div id="idiomas" class="idiomas"></div>
+      <div id="progressoJogador" class="progresso-jogador"></div>
       <div class="selo">KOUNTERA GAMES</div>
     </div>
   </div>
@@ -136,8 +124,20 @@
       </div>
       <div class="me-nota" data-i18n="fim.eliminacoes">ELIMINAÇÕES</div>
       <div id="meRodadas"></div>
+      <div id="meSequencia" class="me-sequencia"></div>
+      <div id="mePremio" class="me-premio"></div>
       <button id="btnAgain" data-i18n="fim.novamente">JOGAR NOVAMENTE</button>
+      <button id="btnLoja" class="ghost" data-i18n="loja.abrir">LOJA</button>
       <button id="btnMenu" class="ghost" data-i18n="fim.menu">VOLTAR AO MENU</button>
+    </div>
+  </div>
+
+  <div id="loja" class="hidden">
+    <div class="m-card loja-card">
+      <h2 data-i18n="loja.titulo">LOJA</h2>
+      <div id="lojaSaldo" class="loja-saldo"></div>
+      <div id="lojaGrade" class="loja-grade"></div>
+      <button id="btnFecharLoja" class="ghost" data-i18n="loja.fechar">FECHAR</button>
     </div>
   </div>
 

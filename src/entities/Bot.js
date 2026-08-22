@@ -234,9 +234,15 @@ export class Bot {
     this.vel.x += (this.desired.x - this.vel.x) * k;
     this.vel.z += (this.desired.z - this.vel.z) * k;
     this.desired.set(0, 0, 0);            // cada quadro pede de novo
+    const antesX = this.pos.x, antesZ = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    if (this.world.collide(this.pos, 0.36)) this.vel.multiplyScalar(0.55);
+    this.world.collide(this.pos, 0.36);
+    // mesma correção do jogador (ver Player.js): a velocidade vem do
+    // deslocamento de verdade, não de um corte fixo a cada encosto — senão
+    // raspar numa parede a caminho de algo já ia freando o bot sozinho.
+    this.vel.x = (this.pos.x - antesX) / dt;
+    this.vel.z = (this.pos.z - antesZ) / dt;
     this.speed = Math.hypot(this.vel.x, this.vel.z);
 
     // travou? recalcula em vez de raspar na parede para sempre
@@ -406,7 +412,10 @@ export class Bot {
   // ------------------------------------------------------------- FUGITIVO
   _runnerBrain(dt, target, sees) {
     const dist = this.pos.distanceTo(target.pos);
-    const ameacado = sees || (this.alertness > 0.45 && dist < 17);
+    // foge mais cedo: esperar quase certeza (0.45) e o caçador a só 17m
+    // deixava a fuga tardia demais — o fugitivo só corria quando o perigo já
+    // estava em cima, sem sobrar tempo real de reação
+    const ameacado = sees || (this.alertness > 0.32 && dist < 22);
 
     if (ameacado) {
       // ao ser avistado, o plano velho não vale mais nada: refaz a rota já
@@ -414,10 +423,22 @@ export class Bot {
         this.state = 'flee';
         this.path = null;
         this.pathTimer = 0;
+        this._fugaCaçadorCel = null;
       }
-      if (this.pathTimer <= 0 || !this.path || !this.path.length) {
+      const hunterCell = worldToCell(target.pos);
+      /*
+       * Sob mira direta, o caçador pode ter fechado a distância antes do
+       * temporizador normal de replanejar (0.5s) permitir uma rota nova — e
+       * insistir numa rota pensada para uma posição antiga dele é o que fazia
+       * a fuga parecer "burra": corria para onde ele TINHA estado, não para
+       * longe de onde está agora.
+       */
+      const fugiuDoAlcance = this._fugaCaçadorCel &&
+        Math.hypot(hunterCell.x - this._fugaCaçadorCel.x, hunterCell.y - this._fugaCaçadorCel.y) >= 3;
+      if (this.pathTimer <= 0 || !this.path || !this.path.length || (sees && fugiuDoAlcance)) {
         // foge do caçador contornando ele, não passando por cima
-        this._repath(this._escapeGoal(target), worldToCell(target.pos));
+        this._repath(this._escapeGoal(target), hunterCell);
+        this._fugaCaçadorCel = hunterCell;
       }
       // enquanto o A* não responde, já sai na direção contrária a ele
       if (!this.path || !this.path.length) {
@@ -426,6 +447,27 @@ export class Bot {
         this.desired.set((fx / len) * CFG.BOT_SPEED_RUN, 0, (fz / len) * CFG.BOT_SPEED_RUN);
       } else {
         this._follow(dt, CFG.BOT_SPEED_RUN);
+      }
+      /*
+       * Sob mira direta, corta em zigue-zague em vez de correr em linha reta
+       * — um alvo fugindo na reta é um alvo fácil. O desvio troca de lado a
+       * cada fração de segundo e soma à direção de fuga, sem sobrepor: o
+       * resultado é renormalizado para não sair mais rápido que o previsto,
+       * só menos previsível.
+       */
+      if (sees && (this.desired.x !== 0 || this.desired.z !== 0)) {
+        this._zigueTimer = (this._zigueTimer ?? 0) - dt;
+        if (this._zigueTimer <= 0) {
+          this._zigueLado = this.rnd() < 0.5 ? -1 : 1;
+          this._zigueTimer = 0.3 + this.rnd() * 0.35;
+        }
+        const fx = this.desired.x, fz = this.desired.z;
+        const flen = Math.hypot(fx, fz) || 1;
+        const lx = -fz / flen, lz = fx / flen;              // perpendicular
+        const mx = fx + lx * this._zigueLado * flen * 0.5;
+        const mz = fz + lz * this._zigueLado * flen * 0.5;
+        const mlen = Math.hypot(mx, mz) || 1;
+        this.desired.set((mx / mlen) * flen, 0, (mz / mlen) * flen);
       }
       this._slamDoor(target);
       return;
@@ -453,14 +495,20 @@ export class Bot {
     const hunter = worldToCell(target.pos);
     const me = this.cell;
     let best = null, bestScore = -Infinity;
-    for (let i = 0; i < 12; i++) {
+    // mais candidatos sorteados = mais variedade de rota de fuga — com só 12
+    // o mesmo punhado de saídas óbvias vencia sempre, e a fuga ficava
+    // previsível de partida para partida
+    for (let i = 0; i < 18; i++) {
       const c = randomFloorCell(this.world.map, this.rnd);
       const dCaçador = gridDistance(this.world, hunter, c, 40);
       if (dCaçador < 0) continue;
       const dMeu = Math.hypot(c.x - me.x, c.y - me.y);
       // longe dele, perto de mim, e de preferência fora da linha de visão dele
       let score = dCaçador * 1.6 - dMeu * 0.4 + this.rnd() * 2;
-      if (!hasLineOfSight(this.world, hunter, c)) score += 4;
+      // sumir da vista dele vale mais que só ganhar distância em linha reta —
+      // dobrar uma esquina corta a perseguição de um jeito que correr na
+      // reta não corta
+      if (!hasLineOfSight(this.world, hunter, c)) score += 6;
       if (score > bestScore) { bestScore = score; best = c; }
     }
     return best || randomFloorCell(this.world.map, this.rnd);

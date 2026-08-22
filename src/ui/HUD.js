@@ -18,12 +18,22 @@ export class HUD {
     };
     this.el.bigSub = this.el.bigmsg.querySelector('.bm-sub');
     this.el.bigMain = this.el.bigmsg.querySelector('.bm-main');
+    this.el.bigExplica = this.el.bigmsg.querySelector('.bm-explica');
 
-    // Setas de direção do oponente. São desenhadas em SVG para terem ponta de
-    // verdade e contorno grosso — barra retangular não comunica direção.
+    /*
+     * Seta de direção do oponente. É desenhada em SVG para ter ponta de
+     * verdade e contorno grosso — barra retangular não comunica direção.
+     *
+     * Uma seta só, não um bando delas: era um POOL de 6, e um passo puxa
+     * ruído a cada fração de segundo (ver NOISE_INTERVAL) — cada passo
+     * pegava um slot livre novo em vez de atualizar o que já apontava para a
+     * mesma origem, e a tela enchia de setas quase sobrepostas apontando
+     * para o mesmo lugar. Um slot só faz a seta sempre saltar para o ruído
+     * mais recente, que é a única direção que importa num dado instante.
+     */
     this.blips = [];
     const NS = 'http://www.w3.org/2000/svg';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 1; i++) {
       const svg = document.createElementNS(NS, 'svg');
       svg.setAttribute('viewBox', '0 0 32 34');
       svg.setAttribute('class', 'blip');
@@ -111,9 +121,10 @@ export class HUD {
     this.el.scoreBot.classList.toggle('lidera', fBot > fSeu);
   }
 
-  big(sub, main, cls = '') {
+  big(sub, main, explica = '', cls = '') {
     this.el.bigSub.textContent = sub;
     this.el.bigMain.textContent = main;
+    this.el.bigExplica.textContent = explica;
     this.el.bigmsg.className = `${cls} pop`;
     // reinicia a animação
     void this.el.bigMain.offsetWidth;

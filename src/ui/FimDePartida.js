@@ -133,14 +133,37 @@ export class FimDePartida {
    * @param {number} seu     eliminações suas
    * @param {number} dele    eliminações do bot
    * @param {{seu:number,bot:number}[]} historico rodada a rodada
+   * @param {{sequencia:number,recorde:number,bateuRecorde:boolean,ativa:boolean,
+   *          moedasGanhas:number,xpGanho:number,nivel:number,subiuNivel:boolean}} [sequencia]
+   *   a corrida e a recompensa desta partida (ver Progresso.js) — `ativa`
+   *   verdadeiro quando esta vitória ainda pode continuar; falso quando a
+   *   corrida já fechou (derrota, empate, ou o jogador escolheu parar).
    */
-  mostrar(vencedor, seu, dele, historico) {
+  mostrar(vencedor, seu, dele, historico, sequencia) {
     this._limpar();
 
     const titulo = document.getElementById('meTitle');
     const faixa = document.getElementById('meFaixa');
     const rodadas = document.getElementById('meRodadas');
+    const seqEl = document.getElementById('meSequencia');
+    const premioEl = document.getElementById('mePremio');
     const btn = document.getElementById('btnAgain');
+
+    if (seqEl) {
+      seqEl.classList.toggle('recorde', !!sequencia?.bateuRecorde);
+      seqEl.textContent = !sequencia ? '' : sequencia.ativa
+        ? t('fim.sequenciaAtual', { n: sequencia.sequencia })
+        : sequencia.bateuRecorde
+          ? `${t('fim.novoRecorde')} ${t('fim.sequenciaFinal', { n: sequencia.sequencia })}`
+          : `${t('fim.sequenciaFinal', { n: sequencia.sequencia })} · ${t('fim.melhorSequencia', { n: sequencia.recorde })}`;
+    }
+
+    if (premioEl) {
+      premioEl.classList.toggle('subiu-nivel', !!sequencia?.subiuNivel);
+      premioEl.textContent = !sequencia ? '' : sequencia.subiuNivel
+        ? `${t('fim.premio', { moedas: sequencia.moedasGanhas, xp: sequencia.xpGanho })} · ${t('fim.subiuNivel', { n: sequencia.nivel })}`
+        : t('fim.premio', { moedas: sequencia.moedasGanhas, xp: sequencia.xpGanho });
+    }
 
     this.el.className = vencedor === 'you' ? 'ganhou' : vencedor === 'bot' ? 'perdeu' : 'empatou';
     titulo.textContent = t(vencedor === 'you' ? 'fim.vitoria'

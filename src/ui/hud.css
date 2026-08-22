@@ -350,6 +350,18 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
 #bigmsg.hunter .bm-main { color: var(--hunter); border-color: rgba(255, 90, 99, .6); }
 #bigmsg.runner .bm-main { color: var(--runner); border-color: rgba(44, 232, 245, .55); }
 #bigmsg.pop .bm-main { animation: surgir .34s cubic-bezier(.2,1.4,.4,1); }
+/*
+ * O que "VOCÊ CAÇA" sozinho não diz: quanto tempo, o que fazer com ele, e o
+ * que está em jogo. Jogadores de primeira viagem liam o título grande e
+ * saíam andando sem entender a regra — esta linha existe para fechar essa
+ * lacuna, toda vez, não só na primeira rodada (ninguém memoriza na primeira
+ * leitura debaixo de tensão).
+ */
+.bm-explica {
+  font-size: clamp(14px, 2.6vh, 20px); font-weight: 600; line-height: 1.4;
+  color: var(--marfim); margin-top: clamp(10px, 2vh, 18px);
+  max-width: 480px; text-align: center; padding: 0 16px;
+}
 @keyframes surgir { from { transform: scale(.72); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ====================== BOTÕES DO CANTO ====================== */
@@ -405,13 +417,42 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
 }
 
 /* ============================= MENUS ============================= */
-#menu, #pause, #matchend {
+#menu, #pause, #matchend, #loja {
   position: fixed; inset: 0; z-index: 20; display: flex;
   align-items: center; justify-content: center;
   background: radial-gradient(ellipse at 50% 42%, var(--carvao) 0%, var(--preto) 72%);
   overflow: hidden;
 }
 #pause, #matchend { background: rgba(5,4,3,.9); }
+/* a loja abre POR CIMA do fim de partida — fica com o botão pra chamá-la */
+#loja { z-index: 25; background: rgba(5,4,3,.95); }
+
+/* ---- loja (Fase 3 do Roadmap de Progressão) ---- */
+.loja-card { width: min(94vw, 620px); }
+.loja-saldo {
+  margin: 4px 0 18px; font-size: 14px; font-weight: 700; letter-spacing: .1em;
+  color: var(--laranja-lt);
+}
+.loja-grade {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.loja-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 10px; border-radius: var(--raio);
+  background: rgba(247, 118, 34, .06); border: 2px solid rgba(247, 118, 34, .2);
+}
+.loja-item.dono { background: rgba(44, 232, 245, .06); border-color: rgba(44, 232, 245, .25); }
+.loja-item img { width: 100%; max-width: 96px; height: auto; image-rendering: auto; }
+.loja-item b {
+  font-size: 12.5px; font-weight: 700; letter-spacing: .02em; color: var(--marfim);
+  text-align: center;
+}
+.loja-item button {
+  font-size: 12px; letter-spacing: .04em; padding: 8px 14px; margin: 0;
+  box-shadow: none; width: 100%;
+}
+.loja-item button:disabled { opacity: .55; cursor: not-allowed; }
 
 /* A planta de um mapa de verdade, desenhada por MenuArte.js. É a identidade
    do jogo: o que você vê no menu é o mesmo gerador que monta a partida. */
@@ -477,6 +518,22 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
   color: rgba(214, 226, 242, .55);
 }
 
+/* a sequência da corrida atual — ver Progresso.js e o Roadmap de Progressão */
+.me-sequencia {
+  margin-top: 14px; font-size: 13px; font-weight: 700; letter-spacing: .08em;
+  color: var(--laranja-lt); min-height: 1em;
+}
+.me-sequencia.recorde { color: var(--runner); text-shadow: 0 0 20px rgba(44, 232, 245, .4); }
+.me-sequencia:empty { margin-top: 0; }
+
+/* moedas/XP ganhos nesta partida — Fase 2 do Roadmap de Progressão */
+.me-premio {
+  margin-top: 4px; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  color: rgba(214, 226, 242, .7);
+}
+.me-premio.subiu-nivel { color: var(--laranja-lt); font-weight: 700; }
+.me-premio:empty { margin-top: 0; }
+
 /*
  * As três bandeiras, no rodapé do menu.
  *
@@ -527,72 +584,60 @@ body.danger #vignette { box-shadow: inset 0 0 180px 30px rgba(255, 90, 99, .42);
   margin-top: clamp(10px, 1.8vh, 20px); font-size: 12px; font-weight: 700; letter-spacing: .26em;
   color: rgba(214, 226, 242, .42); text-indent: .26em;
 }
+
+/* nível/moedas/melhor sequência — Fase 2 do Roadmap de Progressão */
+.progresso-jogador {
+  margin-top: 8px; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  color: rgba(214, 226, 242, .5);
+}
 .m-card h2 { font-size: clamp(32px, 5.6vh, 44px); font-weight: 700; letter-spacing: .06em; margin-bottom: 16px; }
 #matchend.ganhou h2 { color: var(--runner); text-shadow: 0 0 40px rgba(44, 232, 245, .5); }
 #matchend.perdeu h2 { color: var(--hunter); text-shadow: 0 0 40px rgba(255, 90, 99, .5); }
-.tag {
-  margin: clamp(10px, 2vh, 20px) 0 clamp(8px, 1.6vh, 16px);
-  color: var(--marfim); font-size: clamp(15px, 2.3vh, 18px);
-  letter-spacing: .01em; line-height: 1.5; font-weight: 700;
-}
-
 /*
- * O formato da disputa, explicado uma vez, aqui.
+ * "Como jogar": a mesma caixa que já explicava rodada/partida, com seta para
+ * passar as dicas de jogo depois dela. Existia uma caixa de dicas à parte,
+ * rodando sozinha ao lado desta — mas ela estava na lista do que se sacrifica
+ * primeiro em telas mais baixas (junto da tagline e do selo do estúdio),
+ * porque a regra é que nunca abre mão de espaço. Resultado: a dica sumia em
+ * qualquer tela mais baixa. Morando dentro da própria regra, ela aparece em
+ * qualquer altura de tela em que o menu já aparecia.
  *
- * Partida e rodada são duas contagens diferentes e o jogador precisa saber a
- * diferença — mas repetir a explicação num canto do HUD durante o jogo é o que
- * deixou a tela poluída. No menu ela é lida com calma; lá dentro basta
- * "RODADA 1 DE 3" e o placar.
+ * Troca manual, não automática: isto é uma explicação para ler com calma, não
+ * o rodapé de um carrossel. Ver ComoJogar.js.
  */
 .regra {
-  margin: 0 auto clamp(10px, 2vh, 22px); max-width: 480px;
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 auto clamp(10px, 2vh, 22px); max-width: 520px;
   color: var(--fumaca); font-size: clamp(14px, 2vh, 16px); font-weight: 600; line-height: 1.5;
   background: rgba(247, 118, 34, .07);
   border: 2px solid rgba(247, 118, 34, .3); border-radius: var(--raio);
   padding: clamp(9px, 1.6vh, 15px) 18px; text-align: left;
 }
-.regra b { color: var(--laranja-lt); font-weight: 700; }
-
+.regra b, .cj-rotulo { color: var(--laranja-lt); font-weight: 700; }
+.cj-rotulo { letter-spacing: .1em; }
 /*
- * Dicas de jogo, uma por vez, trocando sozinhas.
- *
- * Puramente CSS: cada dica é um <span> absoluto com sua PRÓPRIA @keyframes —
- * porcentagens de keyframe não aceitam variável, então não dá para ter uma
- * única animação parametrizada por dica. Seis blocos, um ciclo de 24s, 4s
- * visível por dica, com uma fração de fade nas bordas de cada janela.
+ * Altura reservada para 3 linhas — o pior caso medido entre as 7 páginas nos
+ * 3 idiomas (o espanhol é o mais longo). Sem isto a caixa cresce e encolhe a
+ * cada troca de página ou de idioma, empurrando o JOGAR e os controles para
+ * cima e para baixo junto — o carrinho de sobe-desce que estava incomodando.
+ * `min-height` em `em` acompanha o próprio font-size da `.regra` (inclusive
+ * o corte menor de telas baixas), então continua valendo em qualquer altura
+ * de tela testada.
  */
-.dicas-jogo {
-  margin: 0 auto clamp(10px, 2vh, 22px); max-width: 480px;
-  display: flex; align-items: baseline; gap: 10px; text-align: left;
+.cj-corpo { flex: 1; min-height: 4.5em; }
+.regra .cj-seta {
+  flex: none; width: 30px; height: 30px; padding: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; text-indent: 0; box-shadow: none;
+  background: rgba(247, 118, 34, .14); border: 2px solid rgba(247, 118, 34, .4);
+  color: var(--laranja-lt); font-size: 18px; font-weight: 700; line-height: 1;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, transform .1s ease;
 }
-.dicas-jogo b {
-  flex: none; color: var(--laranja-lt); font-size: 12px; font-weight: 700;
-  letter-spacing: .12em;
+.regra .cj-seta:hover:not(:disabled) {
+  background: rgba(247, 118, 34, .24); border-color: rgba(247, 118, 34, .6);
+  transform: none; box-shadow: none;
 }
-.dj-rotativo {
-  position: relative; flex: 1; min-height: 2.8em;
-  color: var(--fumaca); font-size: 13px; font-weight: 600; line-height: 1.4;
-}
-.dj-rotativo span {
-  position: absolute; inset: 0; opacity: 0;
-  animation-duration: 24s; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
-}
-.dj-rotativo span:nth-child(1) { animation-name: dj0; }
-.dj-rotativo span:nth-child(2) { animation-name: dj1; }
-.dj-rotativo span:nth-child(3) { animation-name: dj2; }
-.dj-rotativo span:nth-child(4) { animation-name: dj3; }
-.dj-rotativo span:nth-child(5) { animation-name: dj4; }
-.dj-rotativo span:nth-child(6) { animation-name: dj5; }
-@keyframes dj0 { 0%, 100% { opacity: 0; } 2.08%, 14.58% { opacity: 1; } 16.67% { opacity: 0; } }
-@keyframes dj1 { 0%, 16.67%, 100% { opacity: 0; } 18.75%, 31.25% { opacity: 1; } 33.33% { opacity: 0; } }
-@keyframes dj2 { 0%, 33.33%, 100% { opacity: 0; } 35.42%, 47.92% { opacity: 1; } 50% { opacity: 0; } }
-@keyframes dj3 { 0%, 50%, 100% { opacity: 0; } 52.08%, 64.58% { opacity: 1; } 66.67% { opacity: 0; } }
-@keyframes dj4 { 0%, 66.67%, 100% { opacity: 0; } 68.75%, 81.25% { opacity: 1; } 83.33% { opacity: 0; } }
-@keyframes dj5 { 0%, 83.33% { opacity: 0; } 85.42%, 97.92% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .dj-rotativo span { animation: none !important; opacity: 0; }
-  .dj-rotativo span:first-child { opacity: 1; }
-}
+.regra .cj-seta:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 
 button {
   font-family: var(--fonte); font-size: 20px; letter-spacing: .14em; font-weight: 700;
@@ -642,8 +687,6 @@ kbd {
   font-family: var(--fonte); font-size: 14px; font-weight: 700;
   letter-spacing: .06em; color: var(--laranja-lt); text-align: center;
 }
-.hint { margin-top: clamp(10px, 1.8vh, 18px); font-size: 13px; font-weight: 600; letter-spacing: .07em; color: rgba(214,226,242,.55); }
-
 /*
  * O menu fala a língua do aparelho.
  * Num celular, "SHIFT para correr" e "clique para travar o mouse" não são só
@@ -665,7 +708,7 @@ kbd {
 .keys-toque em { font-style: normal; letter-spacing: .02em; }
 .hint-toque { margin-top: clamp(10px, 1.8vh, 18px); font-size: 13px; font-weight: 600; letter-spacing: .07em; color: rgba(214,226,242,.55); }
 
-body.no-toque .keys, body.no-toque .hint { display: none; }
+body.no-toque .keys { display: none; }
 body.no-toque .keys-toque { display: grid; }
 body.no-toque .hint-toque { display: block; }
 /* ====================== FIM DE PARTIDA ====================== */
@@ -787,25 +830,23 @@ body.no-toque .hint-toque { display: block; }
  * de o menu existir. Abaixo disso o cartão volta a rolar, que é melhor do que
  * esconder como se joga.
  */
-/* 720/768px de altura (laptops comuns) já ficam justos com as dicas somadas
-   ao resto — elas somem primeiro, bem antes do corte de 640px abaixo. */
-@media (max-height: 800px) {
-  .dicas-jogo { display: none; }
-}
 @media (max-height: 640px) {
-  .tag, .selo { display: none; }
+  .selo, .progresso-jogador { display: none; }
   .id-bt img { width: 28px; height: 19px; }
   .marca-jogo span { line-height: .82; }
   .guilhotina { margin: 5px 0 4px; }
 }
 @media (max-height: 440px) {
-  .hint, .hint-toque { display: none; }
+  .hint-toque { display: none; }
   .idiomas { margin-top: 8px; }
   .id-bt img { width: 25px; height: 17px; }
   .marca-jogo span { line-height: .78; }
   .guilhotina { height: 6px; margin: 3px 0 2px; }
   body.no-toque .hint-toque { display: none; }
+  /* 2 linhas bastam para as 7 páginas nos 3 idiomas nesta faixa — a fonte
+     menor cabe mais caractere por linha, então o pior caso encolhe junto. */
   .regra { font-size: 13px; padding: 7px 13px; margin-bottom: 9px; line-height: 1.4; }
+  .cj-corpo { min-height: 2.8em; }
   .keys, .keys-toque { font-size: 13px; gap: 3px; margin-top: 8px; }
   kbd, .keys-toque b { padding: 3px 8px; font-size: 12px; min-width: 28px; }
   .keys-toque b { min-width: 78px; }

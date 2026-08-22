@@ -23,8 +23,16 @@ let emJogo = false;
  * quando roda dentro de um iframe qualquer que não seja a página de verdade do
  * Poki — o SDK provavelmente espera um aperto de mão com quem o embutiu, que
  * nunca chega fora do lugar certo. E isso inclui o itch.io, que também entrega
- * jogos dentro de um iframe. Sem este limite, o boot inteiro travaria atrás de
- * um SDK que nunca ia responder, em qualquer host que não fosse o Poki mesmo.
+ * jogos dentro de um iframe. Sem este limite, `pokiPronto` (em main.js) nunca
+ * resolveria fora do Poki, e `gameLoadingFinished()` nunca seria chamado.
+ *
+ * O limite aqui é generoso de propósito: o Inspector ativa um "debug mode"
+ * por cima do aperto de mão normal (login e gamesave simulados), o que pode
+ * levar mais que poucos segundos. Como `init()` não trava mais o resto do
+ * boot (main.js só espera esta promessa na hora de avisar o carregamento,
+ * não antes de nada), dar mais tempo aqui não atrasa ninguém fora do Poki —
+ * e evita cortar cedo demais um aperto de mão que ainda ia responder,
+ * chamando `gameLoadingFinished()` antes da hora e sendo ignorado por isso.
  *
  * `alvo` pode rejeitar, travar, ou até lançar antes de virar promessa — as três
  * coisas viram "sem resposta a tempo, seguimos sem ela".
@@ -42,7 +50,7 @@ function comLimite(criarPromessa, ms) {
 export function init() {
   const s = sdk();
   if (!s) return Promise.resolve();
-  return comLimite(() => s.init(), 4000);
+  return comLimite(() => s.init(), 12000);
 }
 
 /** Sinaliza que o carregamento acabou: é o que faz o loading do Poki sumir. */

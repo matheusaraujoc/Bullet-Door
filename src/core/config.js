@@ -14,8 +14,13 @@ export const CFG = {
   ELIM_PARA_VENCER: 2,
   RODADAS_PADRAO: 3,
   MAX_RODADAS: 5,
-  INTRO_TIME: 3,
-  SWAP_TIME: 1.4,       // pausa curta da troca de papéis
+  // Tempo generoso de propósito: a explicação de "você caça/foge" é uma frase
+  // inteira agora, não só um título. Quem já sabe a regra pula com um clique
+  // ou qualquer tecla (ver _bindMenus em Game.js) — ninguém fica preso
+  // esperando, mas quem ainda está aprendendo tem tempo de ler antes de o
+  // jogo empurrar para o próximo passo sozinho.
+  INTRO_TIME: 6,
+  SWAP_TIME: 6,
 
   // --- jogador ---
   EYE_H: 1.62,

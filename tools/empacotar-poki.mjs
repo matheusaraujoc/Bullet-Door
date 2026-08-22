@@ -59,8 +59,12 @@ console.log(`
     tela cheia, ESC, roda do mouse e as setas não rolam a página por baixo
 
   O que NÃO foi implementado, e por quê:
-    rewardedBreak()  o jogo não tem economia (moedas, vidas extras) para
-                     trocar por um anúncio assistido
-    login / getUser  não há progresso ligado a conta — cada partida é
-                     independente, então não há o que persistir por jogador
+    rewardedBreak()  agora tem economia de verdade (moedas + loja) pra trocar
+                     por um anúncio assistido — virou candidato natural pra
+                     próxima leva, não foi feito ainda por falta de política
+                     de frequência de anúncio definida
+    login / getUser  o progresso (moedas, XP, nível, catálogo, melhor
+                     sequência) já persiste, mas só no navegador
+                     (localStorage) — sem conta de verdade, não há o que
+                     sincronizar entre aparelhos
 `);

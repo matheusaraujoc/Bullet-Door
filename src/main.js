@@ -14,10 +14,19 @@ const q = new URLSearchParams(location.search);
 if (q.has('fast')) { CFG.PHASE_TIME = 8; CFG.INTRO_TIME = 1; CFG.SWAP_TIME = 1; }
 
 evitarRolagemDaPagina();
-// "Initialize the SDK at the start of your game" — antes de qualquer outra
-// coisa, e sem esse controle não bloquear o restante: fora do Poki o SDK nem
-// existe, e Poki.init() já resolve na hora nesse caso.
-await pokiInit();
+/*
+ * "Initialize the SDK at the start of your game" — chamado já na primeira
+ * linha possível, mas SEM esperar a resposta aqui: `init()` só resolve de
+ * verdade depois de um aperto de mão com quem embutiu o jogo, e o Inspector
+ * simula login e gamesave por cima disso, o que pode levar mais que os
+ * poucos segundos que os modelos já levam para carregar. Travar o boot
+ * inteiro atrás dessa resposta (como era antes) arriscava chamar
+ * `gameLoadingFinished()` cedo demais em qualquer host mais lento — e o
+ * Inspector rejeita exatamente essa chamada se ela não veio depois do init
+ * de verdade. `pokiPronto` é aguardado só ali embaixo, na hora de avisar que
+ * o carregamento terminou, sem atrasar mais nada além disso.
+ */
+const pokiPronto = pokiInit();
 
 const canvas = document.getElementById('scene');
 const game = new Game(canvas);
@@ -45,12 +54,15 @@ const carga = { progresso: 0, pronto: false };
 const carregando = game.load(p => { carga.progresso = p; }).then(
   () => {
     carga.pronto = true; carga.progresso = 1; btn.disabled = false; btn.textContent = t('menu.jogar');
-    pokiCarregou();     // é isso que faz o loading do Poki sumir
   },
   e => {
     carga.pronto = true; btn.textContent = t('menu.erro'); console.error('falha ao carregar os modelos:', e);
-    pokiCarregou();     // carregou errado, mas carregou — o loader deles não pode ficar preso
   });
+// só avisa o Poki depois das DUAS coisas: os modelos (carregando, com erro ou
+// sem) e o aperto de mão do SDK (pokiPronto). `.finally` não muda o valor nem
+// o instante em que `carregando` resolve — quem espera por ela (mais abaixo)
+// não fica preso à resposta do Poki.
+carregando.finally(() => pokiPronto.then(pokiCarregou));
 
 if (!q.has('fast') && !q.has('semintro')) await tocarIntro({ carga });
 menu.classList.remove('hidden');

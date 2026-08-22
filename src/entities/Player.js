@@ -125,9 +125,23 @@ export class Player {
     const sp = Math.hypot(this.vel.x, this.vel.z);
     if (sp > alvo) { this.vel.x *= alvo / sp; this.vel.z *= alvo / sp; }
 
+    const antesX = this.pos.x, antesZ = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    if (this.world.collide(this.pos, CFG.RADIUS)) this.vel.multiplyScalar(0.72);
+    this.world.collide(this.pos, CFG.RADIUS);
+    /*
+     * A velocidade depois disto é o quanto o corpo REALMENTE andou, não a que
+     * ele tentou. Cortar a velocidade toda (um fator fixo) toda vez que a
+     * colisão empurra de volta punia até o deslizar raso numa parede — andar
+     * quase paralelo a ela ainda encosta um pouco a cada quadro, e o corte
+     * antigo se acumulava quadro a quadro até o jogador quase parar de vez,
+     * mesmo sem estar realmente travado. Medindo o deslocamento de verdade: um
+     * encontrão de frente (empurrado de volta pro mesmo lugar) já cai a zero
+     * sozinho; deslizar na tangente da parede mal perde velocidade, porque o
+     * deslocamento ao longo dela continua quase inteiro.
+     */
+    this.vel.x = (this.pos.x - antesX) / dt;
+    this.vel.z = (this.pos.z - antesZ) / dt;
     this.speed = Math.hypot(this.vel.x, this.vel.z);
 
     // ---- passos e ruído ----
